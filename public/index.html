@@ -67,32 +67,31 @@
       const girilenAd = document.getElementById("kullaniciAdi").value.trim();
       if (girilenAd === "") return alert("Lütfen isim girin.");
       kullaniciAdi = girilenAd;
+      socket.emit("giris", kullaniciAdi);
       document.getElementById("girisEkrani").style.display = "none";
       document.getElementById("sohbetEkrani").style.display = "block";
     }
 
     function mesajGonder() {
       const mesajInput = document.getElementById("mesajInput");
-      const mesaj = mesajInput.value.trim();
-      if (mesaj === "") return;
-      const veri = { kullanici: kullaniciAdi, mesaj };
-      socket.emit("mesaj", veri);
-      mesajEkle(veri);
+      const metin = mesajInput.value.trim();
+      if (metin === "") return;
+      socket.emit("mesaj", { metin });
       mesajInput.value = "";
-    }
-
-    function mesajEkle(veri) {
-      const mesajlar = document.getElementById("mesajlar");
-      const div = document.createElement("div");
-      div.className = "mesaj";
-      div.textContent = `${veri.kullanici}: ${veri.mesaj}`;
-      mesajlar.appendChild(div);
-      mesajlar.scrollTop = mesajlar.scrollHeight;
     }
 
     socket.on("mesaj", (veri) => {
       mesajEkle(veri);
     });
+
+    function mesajEkle(veri) {
+      const mesajlar = document.getElementById("mesajlar");
+      const div = document.createElement("div");
+      div.className = "mesaj";
+      div.textContent = `${veri.isim} (${veri.zaman}): ${veri.metin}`;
+      mesajlar.appendChild(div);
+      mesajlar.scrollTop = mesajlar.scrollHeight;
+    }
   </script>
 
 </body>
