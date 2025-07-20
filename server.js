@@ -7,16 +7,20 @@ const io = require("socket.io")(http);
 const fs = require("fs");
 
 const PORT = process.env.PORT || 3000;
-
 let mesajlar = [];
 
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json());
 
 app.use(session({
+  name: "kelebeksid",
   secret: "kelebek-gizli",
   resave: false,
-  saveUninitialized: true
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 gün
+  }
 }));
 
 const KULLANICI_YOLU = path.join(__dirname, "users.json");
@@ -35,10 +39,8 @@ function kullaniciKaydet(yeni) {
 app.post("/register", (req, res) => {
   const { nickname, sifre, dogumtarihi } = req.body;
   if (!nickname || !sifre || !dogumtarihi) return res.status(400).send("Eksik bilgi");
-
   const varMi = kayitliKullanicilar().find(k => k.nickname === nickname);
   if (varMi) return res.status(409).send("Zaten var");
-
   kullaniciKaydet({ nickname, sifre, dogumtarihi });
   req.session.kullanici = nickname;
   res.sendStatus(200);
