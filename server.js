@@ -5,10 +5,18 @@ const app = express();
 const http = require("http").createServer(app);
 const path = require("path");
 const io = require("socket.io")(http);
+const fs = require("fs-extra");
 const PORT = process.env.PORT || 3000;
 
-const users = {}; // Kullanıcı veritabanı gibi davranacak
-const mesajlar = []; // Geçici mesaj arşivi
+const MESAJ_DOSYASI = path.join(__dirname, "mesajlar.json");
+
+let users = {}; // Geçici kullanıcı veritabanı
+let mesajlar = [];
+
+// Mesajları yedekten yükle
+if (fs.existsSync(MESAJ_DOSYASI)) {
+  mesajlar = fs.readJsonSync(MESAJ_DOSYASI);
+}
 
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json());
@@ -52,11 +60,17 @@ app.get("/me", (req, res) => {
   }
 });
 
+app.get("/mesajlar", (req, res) => {
+  if (!req.session.kullanici) return res.status(401).send("Giriş yapılmamış");
+  res.json(mesajlar);
+});
+
 io.on("connection", (socket) => {
   console.log("Bir kullanıcı bağlandı");
 
   socket.on("mesaj", (veri) => {
     mesajlar.push(veri);
+    fs.writeJsonSync(MESAJ_DOSYASI, mesajlar, { spaces: 2 });
     io.emit("mesaj", veri);
   });
 });
