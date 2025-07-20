@@ -1,69 +1,81 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kelebek Sohbet</title>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: #f3f4f6;
-      color: #333;
+      background: #f2f2f2;
+      margin: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 20px;
+      justify-content: center;
+      min-height: 100vh;
     }
-    #girisEkrani, #sohbetEkrani {
-      display: none;
-      width: 100%;
-      max-width: 600px;
-    }
-    input, button {
-      padding: 10px;
-      font-size: 1rem;
-      margin: 5px;
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
       width: 90%;
       max-width: 500px;
     }
-    #mesajlar {
+    h2 {
+      margin-bottom: 1rem;
+    }
+    input, button {
+      width: 100%;
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      border-radius: 5px;
       border: 1px solid #ccc;
-      padding: 10px;
+    }
+    #mesajlar {
       height: 300px;
       overflow-y: auto;
-      margin-top: 10px;
-      background: #fff;
-      width: 100%;
+      background: #f9f9f9;
+      margin: 1rem 0;
+      padding: 1rem;
+      border-radius: 8px;
     }
     .mesaj {
-      margin-bottom: 10px;
-      padding: 8px;
-      border-radius: 12px;
-      background: #dbeafe;
-      word-break: break-word;
+      background: #e0f7fa;
+      padding: 0.5rem;
+      border-radius: 5px;
+      margin-bottom: 0.5rem;
     }
+    .gizli { display: none; }
   </style>
 </head>
 <body>
-
-  <div id="girisEkrani">
+  <div class="container" id="girisEkrani">
     <h2>Giriş Yap</h2>
-    <input type="text" id="nickname" placeholder="Kullanıcı adı" />
-    <input type="password" id="sifre" placeholder="Şifre" />
+    <input type="text" id="girisNick" placeholder="Kullanıcı Adı">
+    <input type="password" id="girisSifre" placeholder="Şifre">
     <button onclick="girisYap()">Giriş Yap</button>
     <p>veya</p>
-    <input type="text" id="kayitAd" placeholder="Yeni kullanıcı adı" />
-    <input type="password" id="kayitSifre" placeholder="Şifre" />
-    <input type="date" id="dogumtarihi" />
-    <button onclick="kayitOl()">Kayıt Ol</button>
+    <button onclick="toggleKayit()">Hesabın yok mu? Kayıt Ol</button>
   </div>
 
-  <div id="sohbetEkrani">
+  <div class="container gizli" id="kayitEkrani">
+    <h2>Kayıt Ol</h2>
+    <input type="text" id="kayitNick" placeholder="Kullanıcı Adı">
+    <input type="password" id="kayitSifre" placeholder="Şifre">
+    <input type="date" id="kayitDogum">
+    <button onclick="kayitOl()">Kayıt Ol</button>
+    <p>veya</p>
+    <button onclick="toggleGiris()">Zaten hesabın var mı?</button>
+  </div>
+
+  <div class="container gizli" id="sohbetEkrani">
     <h2>Sohbet</h2>
     <div id="mesajlar"></div>
-    <input type="text" id="mesajInput" placeholder="Mesaj..." />
+    <input type="text" id="mesajInput" placeholder="Mesaj yaz...">
     <button onclick="mesajGonder()">Gönder</button>
-    <button onclick="cikisYap()">Çıkış</button>
+    <button onclick="cikisYap()">Çıkış Yap</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -76,37 +88,25 @@
       if (res.ok) {
         const data = await res.json();
         kullanici = data.kullanici;
-        window.kullanici = data.kullanici; // GLOBAL ATAMA
-        document.getElementById("girisEkrani").style.display = "none";
-        document.getElementById("sohbetEkrani").style.display = "block";
-        eskiMesajlariYukle();
-      } else {
-        document.getElementById("girisEkrani").style.display = "block";
+        document.getElementById("girisEkrani").classList.add("gizli");
+        document.getElementById("sohbetEkrani").classList.remove("gizli");
+        mesajlariGetir();
       }
     }
 
-    async function eskiMesajlariYukle() {
-      const res = await fetch("/mesajlar");
-      const data = await res.json();
-      data.forEach(mesajEkle);
+    function toggleKayit() {
+      document.getElementById("girisEkrani").classList.add("gizli");
+      document.getElementById("kayitEkrani").classList.remove("gizli");
     }
-
-    async function girisYap() {
-      const nickname = document.getElementById("nickname").value;
-      const sifre = document.getElementById("sifre").value;
-      const res = await fetch("/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nickname, sifre })
-      });
-      if (res.ok) location.reload();
-      else alert("Giriş başarısız");
+    function toggleGiris() {
+      document.getElementById("kayitEkrani").classList.add("gizli");
+      document.getElementById("girisEkrani").classList.remove("gizli");
     }
 
     async function kayitOl() {
-      const nickname = document.getElementById("kayitAd").value;
+      const nickname = document.getElementById("kayitNick").value.trim();
       const sifre = document.getElementById("kayitSifre").value;
-      const dogumtarihi = document.getElementById("dogumtarihi").value;
+      const dogumtarihi = document.getElementById("kayitDogum").value;
       const res = await fetch("/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -116,31 +116,45 @@
       else alert("Kayıt başarısız");
     }
 
+    async function girisYap() {
+      const nickname = document.getElementById("girisNick").value.trim();
+      const sifre = document.getElementById("girisSifre").value;
+      const res = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nickname, sifre })
+      });
+      if (res.ok) location.reload();
+      else alert("Giriş başarısız");
+    }
+
     async function cikisYap() {
       await fetch("/logout", { method: "POST" });
       location.reload();
     }
 
-    function mesajGonder() {
-      const mesajInput = document.getElementById("mesajInput");
-      const metin = mesajInput.value.trim();
-      if (!metin) return;
-      const zaman = new Date().toLocaleTimeString("tr-TR", { hour: '2-digit', minute: '2-digit' });
-      socket.emit("mesaj", { isim: window.kullanici || kullanici, metin, zaman });
-      mesajInput.value = "";
+    async function mesajlariGetir() {
+      const res = await fetch("/mesajlar");
+      const veriler = await res.json();
+      veriler.forEach(mesajEkle);
     }
 
-    socket.on("mesaj", (veri) => {
-      mesajEkle(veri);
-    });
+    function mesajGonder() {
+      const input = document.getElementById("mesajInput");
+      const metin = input.value.trim();
+      if (!metin) return;
+      const zaman = new Date().toLocaleTimeString("tr-TR", { hour: '2-digit', minute: '2-digit' });
+      socket.emit("mesaj", { metin, isim: kullanici, zaman });
+      input.value = "";
+    }
+
+    socket.on("mesaj", veri => mesajEkle(veri));
 
     function mesajEkle(veri) {
-      const mesajlar = document.getElementById("mesajlar");
       const div = document.createElement("div");
       div.className = "mesaj";
       div.textContent = `${veri.isim} (${veri.zaman}): ${veri.metin}`;
-      mesajlar.appendChild(div);
-      mesajlar.scrollTop = mesajlar.scrollHeight;
+      document.getElementById("mesajlar").appendChild(div);
     }
 
     kontrolEt();
