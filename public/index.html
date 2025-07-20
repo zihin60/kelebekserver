@@ -75,6 +75,8 @@
     <div id="mesajlar"></div>
     <input type="text" id="mesajInput" placeholder="Mesaj...">
     <button onclick="mesajGonder()">Gönder</button>
+    <button onclick="cikisYap()" style="margin-top:10px; background:#ddd; color:#000;">Çıkış Yap</button>
+    <div id="kullaniciListesi" style="margin-top:10px; font-size:0.9rem; color:#555;"></div>
   </div>
 
   <script>
@@ -131,11 +133,25 @@
       input.value = "";
     }
 
+    function cikisYap() {
+      fetch("https://kelebekserver.onrender.com/logout", {
+        method: "POST",
+        credentials: "include"
+      }).then(() => {
+        location.reload();
+      });
+    }
+
     socket.on("mesaj", (data) => {
       const div = document.createElement("div");
       div.className = "mesaj";
       div.innerText = `${data.from}: ${data.text}`;
       document.getElementById("mesajlar").appendChild(div);
+    });
+
+    socket.on("kullanici-listesi", (liste) => {
+      const div = document.getElementById("kullaniciListesi");
+      div.innerText = "Çevrim içi: " + liste.join(", ");
     });
 
     kontrolEt();
