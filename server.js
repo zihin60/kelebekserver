@@ -2,19 +2,18 @@ const express = require("express");
 const session = require("express-session");
 const bodyParser = require("body-parser");
 const path = require("path");
+const fs = require("fs-extra");
+const bcrypt = require("bcrypt");
 const http = require("http").createServer();
-const io = require("socket.io")(http, {
-  cors: { origin: "*" }
-});
+const io = require("socket.io")(http, { cors: { origin: "*" } });
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Oturum yönetimi
 app.use(session({
   secret: "kelebek-gizli-anahtar",
   resave: false,
   saveUninitialized: true,
-  cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 } // 7 gün
+  cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 }
 }));
 
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -23,26 +22,48 @@ app.use(express.static(path.join(__dirname, "public")));
 
 const logs = [];
 const kullaniciDurumlari = {};
+const VERI_YOLU = path.join(__dirname, "veri");
+fs.ensureDirSync(VERI_YOLU);
 
-app.get("/log-zeynep", (req, res) => {
-  const ip = req.headers["x-forwarded-for"] || req.connection.remoteAddress;
-  const ua = req.headers["user-agent"];
-  const log = {
-    ip,
-    cihaz: /mobile/i.test(ua) ? "Mobil" : "Masaüstü",
-    tarayici: ua,
-    zaman: new Date().toISOString()
-  };
-  logs.push(log);
-  console.log("Zeynep loglandı:", log);
-  res.sendStatus(200);
+app.post("/register", async (req, res) => {
+  const { nickname, sifre, dogumtarihi } = req.body;
+  const kullaniciDosyasi = path.join(VERI_YOLU, `${nickname}.json`);
+
+  if (await fs.pathExists(kullaniciDosyasi)) {
+    return res.status(409).send("Bu kullanıcı adı zaten var.");
+  }
+
+  const hash = await bcrypt.hash(sifre, 10);
+  const veri = { nickname, sifre: hash, dogumtarihi, mesajlar: [] };
+  await fs.writeJson(kullaniciDosyasi, veri);
+  req.session.kullanici = nickname;
+  res.status(201).send("Kayıt başarılı");
 });
 
-app.get("/admin", (req, res) => {
-  if (req.query.pass === "kelebek123") {
-    res.json(logs);
+app.post("/login", async (req, res) => {
+  const { nickname, sifre } = req.body;
+  const kullaniciDosyasi = path.join(VERI_YOLU, `${nickname}.json`);
+
+  if (!await fs.pathExists(kullaniciDosyasi)) {
+    return res.status(404).send("Kullanıcı bulunamadı");
+  }
+
+  const veri = await fs.readJson(kullaniciDosyasi);
+  const dogruMu = await bcrypt.compare(sifre, veri.sifre);
+
+  if (!dogruMu) {
+    return res.status(401).send("Şifre yanlış");
+  }
+
+  req.session.kullanici = nickname;
+  res.send("Giriş başarılı");
+});
+
+app.get("/me", (req, res) => {
+  if (req.session.kullanici) {
+    res.send({ kullanici: req.session.kullanici });
   } else {
-    res.status(403).send("Yasaklı alan");
+    res.status(401).send("Giriş yapılmamış");
   }
 });
 
@@ -50,15 +71,30 @@ io.on("connection", (socket) => {
   console.log("Bir kullanıcı bağlandı.");
   let kullaniciAdi = "";
 
-  socket.on("yeni-kullanici", (ad) => {
+  socket.on("yeni-kullanici", async (ad) => {
     kullaniciAdi = ad;
     kullaniciDurumlari[kullaniciAdi] = true;
     io.emit("kullanici-durumu", { kullanici: kullaniciAdi, durum: "online" });
+
+    const kullaniciDosyasi = path.join(VERI_YOLU, `${kullaniciAdi}.json`);
+    if (await fs.pathExists(kullaniciDosyasi)) {
+      const veri = await fs.readJson(kullaniciDosyasi);
+      veri.mesajlar.forEach(msg => {
+        socket.emit("mesaj", msg);
+      });
+    }
   });
 
-  socket.on("mesaj", (data) => {
+  socket.on("mesaj", async (data) => {
     data.id = Date.now().toString();
     io.emit("mesaj", data);
+
+    const dosya = path.join(VERI_YOLU, `${data.from}.json`);
+    if (await fs.pathExists(dosya)) {
+      const json = await fs.readJson(dosya);
+      json.mesajlar.push(data);
+      await fs.writeJson(dosya, json);
+    }
   });
 
   socket.on("görüldü", (mesajId) => {
