@@ -1,119 +1,56 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Kelebek Sohbet</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #fff8fc;
-      color: #333;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px;
-      overflow: hidden;
-    }
-    #girisEkrani, #sohbetEkrani {
-      display: none;
-      width: 100%;
-      max-width: 600px;
-    }
-    #girisEkrani {
-      display: block;
-    }
-    input, button {
-      padding: 10px;
-      font-size: 1rem;
-      margin: 5px;
-      width: 90%;
-      max-width: 500px;
-    }
-    #mesajlar {
-      border: 1px solid #ccc;
-      padding: 10px;
-      height: 300px;
-      overflow-y: auto;
-      margin-top: 10px;
-      background: #f9f9f9;
-      width: 100%;
-    }
-    .mesaj {
-      margin-bottom: 10px;
-      padding: 5px;
-      border-radius: 8px;
-      background: #e0e7ff;
-    }
+const express = require("express");
+const app = express();
+const http = require("http").createServer(app);
+const path = require("path");
+const io = require("socket.io")(http, {
+  cors: {
+    origin: "*"
+  }
+});
+const PORT = process.env.PORT || 3000;
 
-    .kelebek {
-      position: absolute;
-      font-size: 2rem;
-      animation: ucmak 10s linear infinite;
-    }
-    @keyframes ucmak {
-      0% { transform: translate(0, 0); opacity: 0; }
-      50% { opacity: 1; }
-      100% { transform: translate(100vw, 100vh); opacity: 0; }
-    }
-  </style>
-</head>
-<body>
+const logs = [];
 
-  <div class="kelebek" style="top: 10%; left: 5%;">🦋</div>
-  <div class="kelebek" style="top: 20%; left: 15%; animation-delay: 1s;">🦋</div>
-  <div class="kelebek" style="top: 30%; left: 25%; animation-delay: 2s;">🦋</div>
-  <div class="kelebek" style="top: 40%; left: 35%; animation-delay: 3s;">🦋</div>
-  <div class="kelebek" style="top: 50%; left: 45%; animation-delay: 4s;">🦋</div>
+app.use(express.static(path.join(__dirname, "public")));
 
-  <div id="girisEkrani">
-    <h2>İsim Gir</h2>
-    <input type="text" id="kullaniciAdi" placeholder="Adınız" />
-    <button onclick="girisYap()">Sohbete Başla</button>
-  </div>
+// Zeynep loglama
+app.get("/log-zeynep", (req, res) => {
+  const ip = req.headers["x-forwarded-for"] || req.connection.remoteAddress;
+  const ua = req.headers["user-agent"];
+  const log = {
+    ip,
+    cihaz: /mobile/i.test(ua) ? "Mobil" : "Masaüstü",
+    tarayici: ua,
+    zaman: new Date().toISOString()
+  };
+  logs.push(log);
+  console.log("Zeynep loglandı:", log);
+  res.sendStatus(200);
+});
 
-  <div id="sohbetEkrani">
-    <h2>Sohbet</h2>
-    <div id="mesajlar"></div>
-    <input type="text" id="mesajInput" placeholder="Mesaj..." />
-    <button onclick="mesajGonder()">Gönder</button>
-  </div>
+// Admin log görüntüleme
+app.get("/admin", (req, res) => {
+  if (req.query.pass === "kelebek123") {
+    res.json(logs);
+  } else {
+    res.status(403).send("Yasaklı alan");
+  }
+});
 
-  <script src="https://kelebekserver.onrender.com/socket.io/socket.io.js"></script>
-  <script>
-    const socket = io("https://kelebekserver.onrender.com");
-    let kullaniciAdi = "";
+// Gerçek zamanlı mesajlaşma
+io.on("connection", (socket) => {
+  console.log("Bir kullanıcı bağlandı.");
 
-    function girisYap() {
-      const girilenAd = document.getElementById("kullaniciAdi").value.trim();
-      if (girilenAd === "") return alert("Lütfen isim girin.");
-      kullaniciAdi = girilenAd;
-      document.getElementById("girisEkrani").style.display = "none";
-      document.getElementById("sohbetEkrani").style.display = "block";
-    }
+  // Yeni kullanıcı adı alındıysa, kullanıcı adını socket'e yaz
+  socket.on("mesaj", (data) => {
+    io.emit("mesaj", data); // Tüm istemcilere mesajı yayınla
+  });
 
-    function mesajGonder() {
-      const mesajInput = document.getElementById("mesajInput");
-      const metin = mesajInput.value.trim();
-      if (metin === "") return;
-      const zaman = new Date().toLocaleTimeString("tr-TR", { hour: '2-digit', minute: '2-digit' });
-      socket.emit("mesaj", { metin, isim: kullaniciAdi, zaman });
-      mesajInput.value = "";
-    }
+  socket.on("disconnect", () => {
+    console.log("Kullanıcı ayrıldı.");
+  });
+});
 
-    socket.on("mesaj", (veri) => {
-      mesajEkle(veri);
-    });
-
-    function mesajEkle(veri) {
-      const mesajlar = document.getElementById("mesajlar");
-      const div = document.createElement("div");
-      div.className = "mesaj";
-      div.textContent = `${veri.isim} (${veri.zaman}): ${veri.metin}`;
-      mesajlar.appendChild(div);
-      mesajlar.scrollTop = mesajlar.scrollHeight;
-    }
-  </script>
-
-</body>
-</html>
+http.listen(PORT, () => {
+  console.log(`🌸 Sunucu ${PORT} portunda çalışıyor`);
+});
