@@ -1,116 +1,75 @@
 const express = require("express");
-const session = require("express-session");
+const http = require("http");
+const cors = require("cors");
+const cookieParser = require("cookie-parser");
 const bodyParser = require("body-parser");
-const path = require("path");
-const fs = require("fs-extra");
-const bcrypt = require("bcrypt");
-const http = require("http").createServer();
-const io = require("socket.io")(http, { cors: { origin: "*" } });
+const { Server } = require("socket.io");
+
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.use(session({
-  secret: "kelebek-gizli-anahtar",
-  resave: false,
-  saveUninitialized: true,
-  cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 }
-}));
-
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, "public")));
-
-const logs = [];
-const kullaniciDurumlari = {};
-const VERI_YOLU = path.join(__dirname, "veri");
-fs.ensureDirSync(VERI_YOLU);
-
-app.post("/register", async (req, res) => {
-  const { nickname, sifre, dogumtarihi } = req.body;
-  const kullaniciDosyasi = path.join(VERI_YOLU, `${nickname}.json`);
-
-  if (await fs.pathExists(kullaniciDosyasi)) {
-    return res.status(409).send("Bu kullanıcı adı zaten var.");
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*", // Dilersen buraya frontend adresini yazarsın
+    credentials: true
   }
-
-  const hash = await bcrypt.hash(sifre, 10);
-  const veri = { nickname, sifre: hash, dogumtarihi, mesajlar: [] };
-  await fs.writeJson(kullaniciDosyasi, veri);
-  req.session.kullanici = nickname;
-  res.status(201).send("Kayıt başarılı");
 });
 
-app.post("/login", async (req, res) => {
+app.use(cors({ origin: true, credentials: true }));
+app.use(bodyParser.json());
+app.use(cookieParser());
+
+const users = {}; // key: sessionId, value: nickname
+const sessions = {}; // key: nickname, value: sessionId
+const messages = {}; // key: nickname, value: [{from, text}]
+
+function generateSessionId() {
+  return Math.random().toString(36).substring(2);
+}
+
+app.post("/register", (req, res) => {
+  const { nickname, sifre, dogumtarihi } = req.body;
+  if (sessions[nickname]) return res.status(400).send("Zaten kayıtlı");
+  const sessionId = generateSessionId();
+  users[sessionId] = nickname;
+  sessions[nickname] = sessionId;
+  messages[nickname] = [];
+  res.cookie("sid", sessionId, { httpOnly: true });
+  res.send("Tamam");
+});
+
+app.post("/login", (req, res) => {
   const { nickname, sifre } = req.body;
-  const kullaniciDosyasi = path.join(VERI_YOLU, `${nickname}.json`);
-
-  if (!await fs.pathExists(kullaniciDosyasi)) {
-    return res.status(404).send("Kullanıcı bulunamadı");
-  }
-
-  const veri = await fs.readJson(kullaniciDosyasi);
-  const dogruMu = await bcrypt.compare(sifre, veri.sifre);
-
-  if (!dogruMu) {
-    return res.status(401).send("Şifre yanlış");
-  }
-
-  req.session.kullanici = nickname;
-  res.send("Giriş başarılı");
+  const sessionId = sessions[nickname];
+  if (!sessionId) return res.status(400).send("Böyle bir kullanıcı yok");
+  res.cookie("sid", sessionId, { httpOnly: true });
+  res.send("Giriş yapıldı");
 });
 
 app.get("/me", (req, res) => {
-  if (req.session.kullanici) {
-    res.send({ kullanici: req.session.kullanici });
-  } else {
-    res.status(401).send("Giriş yapılmamış");
-  }
+  const sessionId = req.cookies.sid;
+  const nickname = users[sessionId];
+  if (!nickname) return res.status(401).send("Oturum yok");
+  res.json({ kullanici: nickname });
 });
 
 io.on("connection", (socket) => {
-  console.log("Bir kullanıcı bağlandı.");
-  let kullaniciAdi = "";
-
-  socket.on("yeni-kullanici", async (ad) => {
-    kullaniciAdi = ad;
-    kullaniciDurumlari[kullaniciAdi] = true;
-    io.emit("kullanici-durumu", { kullanici: kullaniciAdi, durum: "online" });
-
-    const kullaniciDosyasi = path.join(VERI_YOLU, `${kullaniciAdi}.json`);
-    if (await fs.pathExists(kullaniciDosyasi)) {
-      const veri = await fs.readJson(kullaniciDosyasi);
-      veri.mesajlar.forEach(msg => {
-        socket.emit("mesaj", msg);
-      });
-    }
+  socket.on("yeni-kullanici", (kullanici) => {
+    socket.nickname = kullanici;
+    if (!messages[kullanici]) messages[kullanici] = [];
+    messages[kullanici].forEach(msg => {
+      socket.emit("mesaj", msg);
+    });
   });
 
-  socket.on("mesaj", async (data) => {
-    data.id = Date.now().toString();
-    io.emit("mesaj", data);
-
-    const dosya = path.join(VERI_YOLU, `${data.from}.json`);
-    if (await fs.pathExists(dosya)) {
-      const json = await fs.readJson(dosya);
-      json.mesajlar.push(data);
-      await fs.writeJson(dosya, json);
-    }
-  });
-
-  socket.on("görüldü", (mesajId) => {
-    socket.broadcast.emit("görüldü", { messageId: mesajId });
-  });
-
-  socket.on("disconnect", () => {
-    if (kullaniciAdi) {
-      kullaniciDurumlari[kullaniciAdi] = false;
-      io.emit("kullanici-durumu", { kullanici: kullaniciAdi, durum: "offline" });
-    }
-    console.log("Kullanıcı ayrıldı.");
+  socket.on("mesaj", (data) => {
+    const from = socket.nickname || "Bilinmeyen";
+    const msg = { from, text: data.text };
+    messages[from].push(msg);
+    io.emit("mesaj", msg);
   });
 });
 
-http.on("request", app);
-http.listen(PORT, () => {
-  console.log(`🌸 Sunucu ${PORT} portunda çalışıyor`);
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log("Server ayakta 🚀 Port:", PORT);
 });
