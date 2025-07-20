@@ -59,7 +59,7 @@ app.get("/me", (req, res) => {
 app.post("/logout", (req, res) => {
   req.session.destroy(() => {
     res.clearCookie("connect.sid");
-    res.sendStatus(200);
+    res.json({ cikis: true });
   });
 });
 
