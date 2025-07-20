@@ -91,6 +91,7 @@
   <script>
     const socket = io("https://kelebekserver.onrender.com");
     let kullaniciAdi = "";
+    let digerKullaniciAktif = false;
 
     function girisYap() {
       const girilenAd = document.getElementById("kullaniciAdi").value.trim();
@@ -118,7 +119,7 @@
     socket.on("mesaj", (veri) => {
       mesajEkle(veri);
       // Sadece bu mesajı ben yazmadıysam ve başka kullanıcı varsa, görülme tetikle
-      if (veri.id && veri.from !== kullaniciAdi && document.hasFocus()) {
+      if (veri.id && veri.from !== kullaniciAdi && digerKullaniciAktif) {
         socket.emit("görüldü", veri.id);
       }
     });
@@ -131,6 +132,12 @@
           tik.textContent = "✓✓";
           tik.style.color = "green";
         }
+      }
+    });
+
+    socket.on("kullanici-durumu", (veri) => {
+      if (veri.kullanici !== kullaniciAdi) {
+        digerKullaniciAktif = veri.durum === "online";
       }
     });
 
