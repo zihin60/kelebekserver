@@ -61,11 +61,11 @@
 <body>
 
   <!-- Kelebek animasyonları -->
-  <div class="kelebek" style="top: 10%; left: 5%;">🦋</div>
-  <div class="kelebek" style="top: 20%; left: 15%; animation-delay: 1s;">🦋</div>
-  <div class="kelebek" style="top: 30%; left: 25%; animation-delay: 2s;">🦋</div>
-  <div class="kelebek" style="top: 40%; left: 35%; animation-delay: 3s;">🦋</div>
-  <div class="kelebek" style="top: 50%; left: 45%; animation-delay: 4s;">🦋</div>
+  <div class="kelebek" style="top: 10%; left: 5%;">🢅</div>
+  <div class="kelebek" style="top: 20%; left: 15%; animation-delay: 1s;">🢅</div>
+  <div class="kelebek" style="top: 30%; left: 25%; animation-delay: 2s;">🢅</div>
+  <div class="kelebek" style="top: 40%; left: 35%; animation-delay: 3s;">🢅</div>
+  <div class="kelebek" style="top: 50%; left: 45%; animation-delay: 4s;">🢅</div>
 
   <!-- Giriş ekranı -->
   <div id="girisEkrani">
@@ -93,9 +93,10 @@
       if (girilenAd === "") return alert("Lütfen isim girin.");
       kullaniciAdi = girilenAd;
 
-      // Giriş yaptıktan sonra "hoş geldin" tarzı başlangıç mesajı istersen:
+      socket.emit("yeni-kullanici", kullaniciAdi);
+
       const zaman = new Date().toLocaleTimeString("tr-TR", { hour: '2-digit', minute: '2-digit' });
-      socket.emit("mesaj", { metin: `${kullaniciAdi} sohbete katıldı`, isim: "Sistem", zaman });
+      socket.emit("mesaj", { from: "Sistem", to: "herkes", content: `${kullaniciAdi} sohbete katıldı`, zaman });
 
       document.getElementById("girisEkrani").style.display = "none";
       document.getElementById("sohbetEkrani").style.display = "block";
@@ -106,19 +107,30 @@
       const metin = mesajInput.value.trim();
       if (metin === "") return;
       const zaman = new Date().toLocaleTimeString("tr-TR", { hour: '2-digit', minute: '2-digit' });
-      socket.emit("mesaj", { metin, isim: kullaniciAdi, zaman });
+      socket.emit("mesaj", { from: kullaniciAdi, to: "herkes", content: metin, zaman });
       mesajInput.value = "";
     }
 
     socket.on("mesaj", (veri) => {
       mesajEkle(veri);
+      if (veri.id) {
+        socket.emit("görüldü", veri.id);
+      }
+    });
+
+    socket.on("görüldü", (veri) => {
+      const mesajDiv = document.querySelector(`[data-id='${veri.messageId}']`);
+      if (mesajDiv) {
+        mesajDiv.innerHTML += " <span style='color: green;'>✓✓ Görüldü</span>";
+      }
     });
 
     function mesajEkle(veri) {
       const mesajlar = document.getElementById("mesajlar");
       const div = document.createElement("div");
       div.className = "mesaj";
-      div.textContent = `${veri.isim} (${veri.zaman}): ${veri.metin}`;
+      div.setAttribute("data-id", veri.id || "");
+      div.textContent = `${veri.from} (${veri.zaman}): ${veri.content || veri.metin}`;
       mesajlar.appendChild(div);
       mesajlar.scrollTop = mesajlar.scrollHeight;
     }
