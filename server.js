@@ -1,75 +1,66 @@
 const express = require("express");
-const http = require("http");
-const cors = require("cors");
-const cookieParser = require("cookie-parser");
-const bodyParser = require("body-parser");
-const { Server } = require("socket.io");
-
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: "*", // Dilersen buraya frontend adresini yazarsın
-    credentials: true
-  }
+const http = require("http").createServer(app);
+const io = require("socket.io")(http, {
+  cors: { origin: "*" }
 });
+const cors = require("cors");
+const session = require("express-session");
+const cookieParser = require("cookie-parser");
 
-app.use(cors({ origin: true, credentials: true }));
-app.use(bodyParser.json());
+app.use(express.json());
 app.use(cookieParser());
+app.use(cors({ origin: true, credentials: true }));
+app.use(session({
+  secret: "kelebek-secret",
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: false, maxAge: 86400000 }
+}));
 
-const users = {}; // key: sessionId, value: nickname
-const sessions = {}; // key: nickname, value: sessionId
-const messages = {}; // key: nickname, value: [{from, text}]
-
-function generateSessionId() {
-  return Math.random().toString(36).substring(2);
-}
+const kullanicilar = {}; // { nickname: { sifre, dogumtarihi } }
+const sohbetler = {};    // { nickname: [mesajlar] }
 
 app.post("/register", (req, res) => {
   const { nickname, sifre, dogumtarihi } = req.body;
-  if (sessions[nickname]) return res.status(400).send("Zaten kayıtlı");
-  const sessionId = generateSessionId();
-  users[sessionId] = nickname;
-  sessions[nickname] = sessionId;
-  messages[nickname] = [];
-  res.cookie("sid", sessionId, { httpOnly: true });
-  res.send("Tamam");
+  if (kullanicilar[nickname]) return res.status(409).send("Kullanıcı zaten var");
+  kullanicilar[nickname] = { sifre, dogumtarihi };
+  sohbetler[nickname] = [];
+  req.session.kullanici = nickname;
+  res.sendStatus(200);
 });
 
 app.post("/login", (req, res) => {
   const { nickname, sifre } = req.body;
-  const sessionId = sessions[nickname];
-  if (!sessionId) return res.status(400).send("Böyle bir kullanıcı yok");
-  res.cookie("sid", sessionId, { httpOnly: true });
-  res.send("Giriş yapıldı");
+  if (!kullanicilar[nickname] || kullanicilar[nickname].sifre !== sifre)
+    return res.status(401).send("Geçersiz giriş");
+  req.session.kullanici = nickname;
+  res.sendStatus(200);
 });
 
 app.get("/me", (req, res) => {
-  const sessionId = req.cookies.sid;
-  const nickname = users[sessionId];
-  if (!nickname) return res.status(401).send("Oturum yok");
-  res.json({ kullanici: nickname });
+  if (!req.session.kullanici) return res.status(401).send("Çıkış yapılmış");
+  res.json({ kullanici: req.session.kullanici });
 });
 
 io.on("connection", (socket) => {
-  socket.on("yeni-kullanici", (kullanici) => {
-    socket.nickname = kullanici;
-    if (!messages[kullanici]) messages[kullanici] = [];
-    messages[kullanici].forEach(msg => {
-      socket.emit("mesaj", msg);
-    });
+  let aktifKullanici = null;
+
+  socket.on("yeni-kullanici", (nickname) => {
+    aktifKullanici = nickname;
+    if (sohbetler[nickname]) {
+      sohbetler[nickname].forEach(msg => {
+        socket.emit("mesaj", msg);
+      });
+    }
   });
 
   socket.on("mesaj", (data) => {
-    const from = socket.nickname || "Bilinmeyen";
-    const msg = { from, text: data.text };
-    messages[from].push(msg);
-    io.emit("mesaj", msg);
+    if (!aktifKullanici) return;
+    const mesaj = { from: aktifKullanici, text: data.text };
+    sohbetler[aktifKullanici].push(mesaj);
+    io.emit("mesaj", mesaj);
   });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log("Server ayakta 🚀 Port:", PORT);
-});
+http.listen(3000, () => console.log("Sunucu 3000 portunda hazır!"));
