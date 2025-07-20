@@ -1,86 +1,87 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8">
-  <title>KelebekServer</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Kelebek Sohbet</title>
   <style>
-    body { font-family: sans-serif; margin: 20px; background: #fdf6f6; }
-    #messages { border: 1px solid #ccc; height: 200px; overflow-y: auto; padding: 10px; background: white; }
-    input { padding: 10px; width: 70%; }
-    button { padding: 10px; }
+    body {
+      font-family: sans-serif;
+      background: #f2f2f2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem;
+    }
+    #messages {
+      width: 100%;
+      max-width: 500px;
+      height: 300px;
+      overflow-y: auto;
+      background: #fff;
+      padding: 1rem;
+      border-radius: 10px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+      margin-bottom: 1rem;
+    }
+    #message-form {
+      display: flex;
+      gap: 0.5rem;
+      width: 100%;
+      max-width: 500px;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 0.5rem;
+      font-size: 1rem;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      border-radius: 5px;
+      border: none;
+      background: #4CAF50;
+      color: white;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
-  <h1>🦋 Kelebek Sohbet</h1>
+  <h1>🐞 Kelebek Sohbet</h1>
 
   <div id="messages"></div>
-  <input id="messageInput" placeholder="Bir şeyler yaz...">
-  <button onclick="sendMessage()">Gönder</button>
-  <br><br>
 
-  <button onclick="startCall()">📞 Sesli Arama Başlat</button>
-  <audio id="remoteAudio" autoplay></audio>
+  <form id="message-form">
+    <input id="message-input" type="text" autocomplete="off" placeholder="Mesajını yaz..." required />
+    <button type="submit">Gönder</button>
+  </form>
 
+  <!-- Socket.io client -->
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
-    const messages = document.getElementById("messages");
-    const input = document.getElementById("messageInput");
 
-    // Mesaj gönder
-    function sendMessage() {
-      const msg = input.value;
-      socket.emit("chat message", msg);
-      appendMessage("Sen: " + msg);
-      input.value = "";
-    }
+    const form = document.getElementById('message-form');
+    const input = document.getElementById('message-input');
+    const messages = document.getElementById('messages');
 
-    // Mesajları ekle
-    function appendMessage(msg) {
-      const div = document.createElement("div");
-      div.textContent = msg;
-      messages.appendChild(div);
-    }
-
-    // Gelen mesaj
-    socket.on("chat message", msg => {
-      appendMessage("Kelebeğin: " + msg);
-    });
-
-    // === WebRTC ===
-    const peer = new RTCPeerConnection();
-    const remoteAudio = document.getElementById("remoteAudio");
-
-    peer.ontrack = (event) => {
-      remoteAudio.srcObject = event.streams[0];
-    };
-
-    navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(stream => {
-      stream.getTracks().forEach(track => peer.addTrack(track, stream));
-    });
-
-    socket.on("incomingCall", fromId => {
-      peer.createOffer().then(offer => {
-        return peer.setLocalDescription(offer).then(() => {
-          socket.emit("signal", { to: fromId, signal: peer.localDescription });
-        });
-      });
-    });
-
-    socket.on("signal", async ({ from, signal }) => {
-      if (signal.type === "offer") {
-        await peer.setRemoteDescription(new RTCSessionDescription(signal));
-        const answer = await peer.createAnswer();
-        await peer.setLocalDescription(answer);
-        socket.emit("signal", { to: from, signal: peer.localDescription });
-      } else if (signal.type === "answer") {
-        await peer.setRemoteDescription(new RTCSessionDescription(signal));
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const message = input.value.trim();
+      if (message !== "") {
+        socket.emit('chat message', message);
+        input.value = '';
       }
     });
 
-    function startCall() {
-      socket.emit("call", socket.id); // Kendine çağrı yolla (tek kişilik test için)
-    }
+    socket.on('chat message', (msg) => {
+      const item = document.createElement('div');
+      item.textContent = msg;
+      messages.appendChild(item);
+      messages.scrollTop = messages.scrollHeight;
+    });
   </script>
 </body>
 </html>
