@@ -13,15 +13,11 @@
       flex-direction: column;
       align-items: center;
       padding: 20px;
-      overflow: hidden;
     }
-    #girisEkrani, #sohbetEkrani {
+    #girisEkrani, #sohbetEkrani, #kayitEkrani, #girisFormu {
       display: none;
       width: 100%;
       max-width: 600px;
-    }
-    #girisEkrani {
-      display: block;
     }
     input, button {
       padding: 10px;
@@ -45,35 +41,25 @@
       border-radius: 8px;
       background: #e0e7ff;
     }
-    .tik {
-      float: right;
-      font-weight: bold;
-      margin-left: 10px;
-    }
-    .kelebek {
-      position: absolute;
-      font-size: 2rem;
-      animation: ucmak 10s linear infinite;
-    }
-    @keyframes ucmak {
-      0% { transform: translate(0, 0); opacity: 0; }
-      50% { opacity: 1; }
-      100% { transform: translate(100vw, 100vh); opacity: 0; }
-    }
   </style>
 </head>
 <body>
 
-  <div class="kelebek" style="top: 10%; left: 5%;">🦋</div>
-  <div class="kelebek" style="top: 20%; left: 15%; animation-delay: 1s;">🦋</div>
-  <div class="kelebek" style="top: 30%; left: 25%; animation-delay: 2s;">🦋</div>
-  <div class="kelebek" style="top: 40%; left: 35%; animation-delay: 3s;">🦋</div>
-  <div class="kelebek" style="top: 50%; left: 45%; animation-delay: 4s;">🦋</div>
+  <div id="kayitEkrani">
+    <h2>Kayıt Ol</h2>
+    <input type="text" id="kayitNick" placeholder="Kullanıcı Adı" />
+    <input type="password" id="kayitSifre" placeholder="Şifre" />
+    <input type="date" id="dogumTarihi" />
+    <button onclick="kayitOl()">Kayıt Ol</button>
+    <p><a href="#" onclick="girisFormunuAc()">Zaten hesabın var mı? Giriş yap</a></p>
+  </div>
 
-  <div id="girisEkrani">
-    <h2>İsim Gir</h2>
-    <input type="text" id="kullaniciAdi" placeholder="Adınız" />
-    <button onclick="girisYap()">Sohbete Başla</button>
+  <div id="girisFormu">
+    <h2>Giriş Yap</h2>
+    <input type="text" id="girisNick" placeholder="Kullanıcı Adı" />
+    <input type="password" id="girisSifre" placeholder="Şifre" />
+    <button onclick="girisYap()">Giriş Yap</button>
+    <p><a href="#" onclick="kayitFormunuAc()">Hesabın yok mu? Kayıt ol</a></p>
   </div>
 
   <div id="sohbetEkrani">
@@ -86,96 +72,88 @@
   <script src="https://kelebekserver.onrender.com/socket.io/socket.io.js"></script>
   <script>
     const socket = io("https://kelebekserver.onrender.com");
-    let kullaniciAdi = localStorage.getItem("kullaniciAdi") || "";
-    let digerKullaniciAktif = false;
+    let kullaniciAdi = "";
 
     window.onload = () => {
-      if (kullaniciAdi) {
-        document.getElementById("girisEkrani").style.display = "none";
-        document.getElementById("sohbetEkrani").style.display = "block";
-        socket.emit("yeni-kullanici", kullaniciAdi);
-        mesajlariYukle();
-      }
+      fetch("/me").then(res => {
+        if (res.ok) {
+          res.json().then(data => {
+            kullaniciAdi = data.kullanici;
+            sohbetEkraniniAc();
+          });
+        } else {
+          document.getElementById("kayitEkrani").style.display = "block";
+        }
+      });
     };
 
+    function kayitFormunuAc() {
+      document.getElementById("kayitEkrani").style.display = "block";
+      document.getElementById("girisFormu").style.display = "none";
+    }
+
+    function girisFormunuAc() {
+      document.getElementById("kayitEkrani").style.display = "none";
+      document.getElementById("girisFormu").style.display = "block";
+    }
+
+    function kayitOl() {
+      const nickname = document.getElementById("kayitNick").value.trim();
+      const sifre = document.getElementById("kayitSifre").value;
+      const dogumtarihi = document.getElementById("dogumTarihi").value;
+      fetch("/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nickname, sifre, dogumtarihi })
+      }).then(res => {
+        if (res.ok) sohbetEkraniniAc();
+        else res.text().then(alert);
+      });
+    }
+
     function girisYap() {
-      const girilenAd = document.getElementById("kullaniciAdi").value.trim();
-      if (girilenAd === "") return alert("Lütfen isim girin.");
-      kullaniciAdi = girilenAd;
-      localStorage.setItem("kullaniciAdi", kullaniciAdi);
-      socket.emit("yeni-kullanici", kullaniciAdi);
+      const nickname = document.getElementById("girisNick").value.trim();
+      const sifre = document.getElementById("girisSifre").value;
+      fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nickname, sifre })
+      }).then(res => {
+        if (res.ok) sohbetEkraniniAc();
+        else res.text().then(alert);
+      });
+    }
 
-      const zaman = new Date().toLocaleTimeString("tr-TR", { hour: '2-digit', minute: '2-digit' });
-      socket.emit("mesaj", { from: "Sistem", to: "herkes", content: `${kullaniciAdi} sohbete katıldı`, zaman });
-
-      document.getElementById("girisEkrani").style.display = "none";
-      document.getElementById("sohbetEkrani").style.display = "block";
+    function sohbetEkraniniAc() {
+      fetch("/me").then(res => res.json()).then(data => {
+        kullaniciAdi = data.kullanici;
+        document.getElementById("kayitEkrani").style.display = "none";
+        document.getElementById("girisFormu").style.display = "none";
+        document.getElementById("sohbetEkrani").style.display = "block";
+        socket.emit("yeni-kullanici", kullaniciAdi);
+      });
     }
 
     function mesajGonder() {
-      const mesajInput = document.getElementById("mesajInput");
-      const metin = mesajInput.value.trim();
+      const metin = document.getElementById("mesajInput").value.trim();
       if (metin === "") return;
       const zaman = new Date().toLocaleTimeString("tr-TR", { hour: '2-digit', minute: '2-digit' });
-      const mesaj = { from: kullaniciAdi, to: "herkes", content: metin, zaman };
-      socket.emit("mesaj", mesaj);
-      mesajInput.value = "";
-      mesajEkle({ ...mesaj, id: Date.now().toString() });
-      kaydetMesaj(mesaj);
+      socket.emit("mesaj", { metin, isim: kullaniciAdi, zaman, from: kullaniciAdi });
+      document.getElementById("mesajInput").value = "";
     }
 
     socket.on("mesaj", (veri) => {
       mesajEkle(veri);
-      if (veri.id && veri.from !== kullaniciAdi && digerKullaniciAktif) {
-        socket.emit("görüldü", veri.id);
-      }
-      kaydetMesaj(veri);
-    });
-
-    socket.on("görüldü", (veri) => {
-      const mesajDiv = document.querySelector(`[data-id='${veri.messageId}']`);
-      if (mesajDiv) {
-        const tik = mesajDiv.querySelector(".tik");
-        if (tik) {
-          tik.textContent = "✓✓";
-          tik.style.color = "green";
-        }
-      }
-    });
-
-    socket.on("kullanici-durumu", (veri) => {
-      if (veri.kullanici !== kullaniciAdi) {
-        digerKullaniciAktif = veri.durum === "online";
-      }
     });
 
     function mesajEkle(veri) {
       const mesajlar = document.getElementById("mesajlar");
       const div = document.createElement("div");
       div.className = "mesaj";
-      div.setAttribute("data-id", veri.id || "");
-
-      let tikHTML = "";
-      if (veri.from === kullaniciAdi) {
-        tikHTML = "<span class='tik'>✓</span>";
-      }
-
-      div.innerHTML = `${veri.from} (${veri.zaman}): ${veri.content || veri.metin} ${tikHTML}`;
+      div.textContent = `${veri.isim} (${veri.zaman}): ${veri.metin}`;
       mesajlar.appendChild(div);
       mesajlar.scrollTop = mesajlar.scrollHeight;
     }
-
-    function kaydetMesaj(mesaj) {
-      let gecmis = JSON.parse(localStorage.getItem("mesajlar") || "[]");
-      gecmis.push(mesaj);
-      localStorage.setItem("mesajlar", JSON.stringify(gecmis));
-    }
-
-    function mesajlariYukle() {
-      let gecmis = JSON.parse(localStorage.getItem("mesajlar") || "[]");
-      gecmis.forEach(mesajEkle);
-    }
   </script>
-
 </body>
 </html>
