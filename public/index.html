@@ -117,7 +117,8 @@
 
     socket.on("mesaj", (veri) => {
       mesajEkle(veri);
-      if (veri.id) {
+      // Sadece bu mesajı ben yazmadıysam, görülme tetikle
+      if (veri.id && veri.from !== kullaniciAdi) {
         socket.emit("görüldü", veri.id);
       }
     });
