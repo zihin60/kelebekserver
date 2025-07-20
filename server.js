@@ -1,47 +1,53 @@
-// server.js
 const express = require("express");
-const session = require("express-session");
 const app = express();
 const http = require("http").createServer(app);
 const path = require("path");
+const session = require("express-session");
 const io = require("socket.io")(http);
-const fs = require("fs-extra");
+const fs = require("fs");
+
 const PORT = process.env.PORT || 3000;
 
-const MESAJ_DOSYASI = path.join(__dirname, "mesajlar.json");
-
-let users = {}; // Geçici kullanıcı veritabanı
 let mesajlar = [];
-
-// Mesajları yedekten yükle
-if (fs.existsSync(MESAJ_DOSYASI)) {
-  mesajlar = fs.readJsonSync(MESAJ_DOSYASI);
-}
 
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json());
+
 app.use(session({
-  secret: "kelebekGizliAnahtari",
+  secret: "kelebek-gizli",
   resave: false,
   saveUninitialized: true
 }));
 
+const KULLANICI_YOLU = path.join(__dirname, "users.json");
+if (!fs.existsSync(KULLANICI_YOLU)) fs.writeFileSync(KULLANICI_YOLU, "[]", "utf8");
+
+function kayitliKullanicilar() {
+  return JSON.parse(fs.readFileSync(KULLANICI_YOLU, "utf8"));
+}
+
+function kullaniciKaydet(yeni) {
+  const mevcut = kayitliKullanicilar();
+  mevcut.push(yeni);
+  fs.writeFileSync(KULLANICI_YOLU, JSON.stringify(mevcut, null, 2), "utf8");
+}
+
 app.post("/register", (req, res) => {
   const { nickname, sifre, dogumtarihi } = req.body;
   if (!nickname || !sifre || !dogumtarihi) return res.status(400).send("Eksik bilgi");
-  if (users[nickname]) return res.status(409).send("Bu kullanıcı zaten var");
 
-  users[nickname] = { sifre, dogumtarihi };
+  const varMi = kayitliKullanicilar().find(k => k.nickname === nickname);
+  if (varMi) return res.status(409).send("Zaten var");
+
+  kullaniciKaydet({ nickname, sifre, dogumtarihi });
   req.session.kullanici = nickname;
   res.sendStatus(200);
 });
 
 app.post("/login", (req, res) => {
   const { nickname, sifre } = req.body;
-  if (!nickname || !sifre) return res.status(400).send("Eksik bilgi");
-  if (!users[nickname]) return res.status(404).send("Kullanıcı bulunamadı");
-  if (users[nickname].sifre !== sifre) return res.status(403).send("Şifre yanlış");
-
+  const eslesen = kayitliKullanicilar().find(k => k.nickname === nickname && k.sifre === sifre);
+  if (!eslesen) return res.status(401).send("Hatalı giriş");
   req.session.kullanici = nickname;
   res.sendStatus(200);
 });
@@ -56,21 +62,17 @@ app.get("/me", (req, res) => {
   if (req.session.kullanici) {
     res.json({ kullanici: req.session.kullanici });
   } else {
-    res.status(401).send("Giriş yapılmamış");
+    res.status(401).send("Giriş yok");
   }
 });
 
 app.get("/mesajlar", (req, res) => {
-  if (!req.session.kullanici) return res.status(401).send("Giriş yapılmamış");
   res.json(mesajlar);
 });
 
-io.on("connection", (socket) => {
-  console.log("Bir kullanıcı bağlandı");
-
-  socket.on("mesaj", (veri) => {
+io.on("connection", socket => {
+  socket.on("mesaj", veri => {
     mesajlar.push(veri);
-    fs.writeJsonSync(MESAJ_DOSYASI, mesajlar, { spaces: 2 });
     io.emit("mesaj", veri);
   });
 });
