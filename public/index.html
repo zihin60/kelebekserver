@@ -45,7 +45,11 @@
       border-radius: 8px;
       background: #e0e7ff;
     }
-
+    .tik {
+      float: right;
+      font-weight: bold;
+      margin-left: 10px;
+    }
     .kelebek {
       position: absolute;
       font-size: 2rem;
@@ -61,11 +65,11 @@
 <body>
 
   <!-- Kelebek animasyonları -->
-  <div class="kelebek" style="top: 10%; left: 5%;">🢅</div>
-  <div class="kelebek" style="top: 20%; left: 15%; animation-delay: 1s;">🢅</div>
-  <div class="kelebek" style="top: 30%; left: 25%; animation-delay: 2s;">🢅</div>
-  <div class="kelebek" style="top: 40%; left: 35%; animation-delay: 3s;">🢅</div>
-  <div class="kelebek" style="top: 50%; left: 45%; animation-delay: 4s;">🢅</div>
+  <div class="kelebek" style="top: 10%; left: 5%;">🦋</div>
+  <div class="kelebek" style="top: 20%; left: 15%; animation-delay: 1s;">🦋</div>
+  <div class="kelebek" style="top: 30%; left: 25%; animation-delay: 2s;">🦋</div>
+  <div class="kelebek" style="top: 40%; left: 35%; animation-delay: 3s;">🦋</div>
+  <div class="kelebek" style="top: 50%; left: 45%; animation-delay: 4s;">🦋</div>
 
   <!-- Giriş ekranı -->
   <div id="girisEkrani">
@@ -121,7 +125,11 @@
     socket.on("görüldü", (veri) => {
       const mesajDiv = document.querySelector(`[data-id='${veri.messageId}']`);
       if (mesajDiv) {
-        mesajDiv.innerHTML += " <span style='color: green;'>✓✓ Görüldü</span>";
+        const tik = mesajDiv.querySelector(".tik");
+        if (tik) {
+          tik.textContent = "✓✓";
+          tik.style.color = "green";
+        }
       }
     });
 
@@ -130,7 +138,13 @@
       const div = document.createElement("div");
       div.className = "mesaj";
       div.setAttribute("data-id", veri.id || "");
-      div.textContent = `${veri.from} (${veri.zaman}): ${veri.content || veri.metin}`;
+
+      let tikHTML = "";
+      if (veri.from === kullaniciAdi) {
+        tikHTML = "<span class='tik'>✓</span>";
+      }
+
+      div.innerHTML = `${veri.from} (${veri.zaman}): ${veri.content || veri.metin} ${tikHTML}`;
       mesajlar.appendChild(div);
       mesajlar.scrollTop = mesajlar.scrollHeight;
     }
