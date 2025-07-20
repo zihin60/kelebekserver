@@ -72,7 +72,7 @@
       const girilenAd = document.getElementById("kullaniciAdi").value.trim();
       if (girilenAd === "") return alert("Lütfen isim girin.");
       kullaniciAdi = girilenAd;
-      socket.emit("giris", kullaniciAdi);
+      socket.emit("mesaj", { metin, isim: kullaniciAdi });
       document.getElementById("girisEkrani").style.display = "none";
       document.getElementById("sohbetEkrani").style.display = "block";
     }
