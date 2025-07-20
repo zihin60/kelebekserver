@@ -1,40 +1,53 @@
 // server.js
 const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+const http = require("http").createServer(app);
+const io = require("socket.io")(http, {
+  cors: {
+    origin: "*"
+  }
+});
+const path = require("path");
+const PORT = process.env.PORT || 3000;
 
-app.use(express.static("public"));
+const logs = [];
+
+app.use(express.static(path.join(__dirname, "public")));
+
+app.get("/log-zeynep", (req, res) => {
+  const ip = req.headers["x-forwarded-for"] || req.connection.remoteAddress;
+  const ua = req.headers["user-agent"];
+  const log = {
+    ip,
+    cihaz: /mobile/i.test(ua) ? "Mobil" : "Masaüstü",
+    tarayici: ua,
+    zaman: new Date().toISOString()
+  };
+  logs.push(log);
+  console.log("Zeynep loglandı:", log);
+  res.sendStatus(200);
+});
+
+app.get("/admin", (req, res) => {
+  if (req.query.pass === "kelebek123") {
+    res.json(logs);
+  } else {
+    res.status(403).send("Yasaklı alan");
+  }
+});
 
 io.on("connection", (socket) => {
-  console.log("Yeni bir kullanıcı bağlandı:", socket.id);
+  console.log("Bir kullanıcı bağlandı.");
 
-  // WebSocket mesajları
-  socket.on("chat message", (msg) => {
-    socket.broadcast.emit("chat message", msg);
-  });
-
-  // WebRTC sinyalleri
-  socket.on("signal", (data) => {
-    socket.to(data.to).emit("signal", {
-      from: socket.id,
-      signal: data.signal,
-    });
-  });
-
-  // WebRTC eşleşme isteği
-  socket.on("call", (id) => {
-    socket.to(id).emit("incoming call", socket.id);
+  socket.on("mesaj", (data) => {
+    io.emit("mesaj", data);
   });
 
   socket.on("disconnect", () => {
-    console.log("Bir kullanıcı ayrıldı:", socket.id);
+    console.log("Kullanıcı ayrıldı.");
   });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log("Sunucu çalışıyor: http://localhost:" + PORT);
+http.listen(PORT, () => {
+  console.log(`Sunucu ${PORT} portunda çalışıyor`);
 });
