@@ -6,82 +6,94 @@
   <title>Kelebek Sohbet</title>
   <style>
     body {
-      font-family: sans-serif;
-      background: #f2f2f2;
+      font-family: 'Segoe UI', sans-serif;
+      background: #fff8fc;
+      color: #333;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 2rem;
+      padding: 20px;
     }
-    #messages {
+    #girisEkrani, #sohbetEkrani {
+      display: none;
       width: 100%;
-      max-width: 500px;
-      height: 300px;
-      overflow-y: auto;
-      background: #fff;
-      padding: 1rem;
-      border-radius: 10px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.1);
-      margin-bottom: 1rem;
+      max-width: 600px;
     }
-    #message-form {
-      display: flex;
-      gap: 0.5rem;
-      width: 100%;
-      max-width: 500px;
+    #girisEkrani {
+      display: block;
     }
-    input[type="text"] {
-      flex: 1;
-      padding: 0.5rem;
+    input, button {
+      padding: 10px;
       font-size: 1rem;
-      border-radius: 5px;
+      margin: 5px;
+    }
+    #mesajlar {
       border: 1px solid #ccc;
+      padding: 10px;
+      height: 300px;
+      overflow-y: scroll;
+      margin-top: 10px;
+      background: #f9f9f9;
     }
-    button {
-      padding: 0.5rem 1rem;
-      font-size: 1rem;
-      border-radius: 5px;
-      border: none;
-      background: #4CAF50;
-      color: white;
-      cursor: pointer;
+    .mesaj {
+      margin-bottom: 10px;
+      padding: 5px;
+      border-radius: 8px;
+      background: #e0e7ff;
     }
   </style>
 </head>
 <body>
-  <h1>🐞 Kelebek Sohbet</h1>
 
-  <div id="messages"></div>
+  <div id="girisEkrani">
+    <h2>İsim Gir</h2>
+    <input type="text" id="kullaniciAdi" placeholder="Adınız" />
+    <button onclick="girisYap()">Sohbete Başla</button>
+  </div>
 
-  <form id="message-form">
-    <input id="message-input" type="text" autocomplete="off" placeholder="Mesajını yaz..." required />
-    <button type="submit">Gönder</button>
-  </form>
+  <div id="sohbetEkrani">
+    <h2>Sohbet</h2>
+    <div id="mesajlar"></div>
+    <input type="text" id="mesajInput" placeholder="Mesaj..." />
+    <button onclick="mesajGonder()">Gönder</button>
+  </div>
 
-  <!-- Socket.io client -->
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
+    let kullaniciAdi = "";
 
-    const form = document.getElementById('message-form');
-    const input = document.getElementById('message-input');
-    const messages = document.getElementById('messages');
+    function girisYap() {
+      const girilenAd = document.getElementById("kullaniciAdi").value.trim();
+      if (girilenAd === "") return alert("Lütfen isim girin.");
+      kullaniciAdi = girilenAd;
+      document.getElementById("girisEkrani").style.display = "none";
+      document.getElementById("sohbetEkrani").style.display = "block";
+    }
 
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const message = input.value.trim();
-      if (message !== "") {
-        socket.emit('chat message', message);
-        input.value = '';
-      }
-    });
+    function mesajGonder() {
+      const mesajInput = document.getElementById("mesajInput");
+      const mesaj = mesajInput.value.trim();
+      if (mesaj === "") return;
+      const veri = { kullanici: kullaniciAdi, mesaj };
+      socket.emit("mesaj", veri);
+      mesajEkle(veri);
+      mesajInput.value = "";
+    }
 
-    socket.on('chat message', (msg) => {
-      const item = document.createElement('div');
-      item.textContent = msg;
-      messages.appendChild(item);
-      messages.scrollTop = messages.scrollHeight;
+    function mesajEkle(veri) {
+      const mesajlar = document.getElementById("mesajlar");
+      const div = document.createElement("div");
+      div.className = "mesaj";
+      div.textContent = `${veri.kullanici}: ${veri.mesaj}`;
+      mesajlar.appendChild(div);
+      mesajlar.scrollTop = mesajlar.scrollHeight;
+    }
+
+    socket.on("mesaj", (veri) => {
+      mesajEkle(veri);
     });
   </script>
+
 </body>
 </html>
