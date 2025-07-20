@@ -1,113 +1,114 @@
+// GÜNCELLENMİŞ VE SAĞLAMLAŞTIRILMIŞ SERVER.JS
 const express = require("express");
+const session = require("express-session");
+const path = require("path");
+const fs = require("fs");
+const bodyParser = require("body-parser");
 const app = express();
 const http = require("http").createServer(app);
-const path = require("path");
-const session = require("express-session");
-const io = require("socket.io")(http);
-const fs = require("fs");
+const io = require("socket.io")(http, {
+  cors: { origin: "*" }
+});
 
 const PORT = process.env.PORT || 3000;
-let mesajlar = [];
+const USERS_FILE = path.join(__dirname, "users.json");
+const MESAJLAR_FILE = path.join(__dirname, "mesajlar.json");
 
-// CORS ve genel header ayarı (502'ye karşı)
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  next();
-});
-
-// Public klasörü tanımla
 app.use(express.static(path.join(__dirname, "public")));
-app.use(express.json());
-
-// Session ayarı
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({
-  name: "kelebeksid",
-  secret: "kelebek-gizli",
+  secret: "kelebek-secret",
   resave: false,
-  saveUninitialized: false,
-  cookie: {
-    httpOnly: true,
-    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 gün
-  }
+  saveUninitialized: true,
+  cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 }
 }));
 
-// Kullanıcı verisi json dosyasında tutuluyor
-const KULLANICI_YOLU = path.join(__dirname, "users.json");
-if (!fs.existsSync(KULLANICI_YOLU)) fs.writeFileSync(KULLANICI_YOLU, "[]", "utf8");
-
-function kayitliKullanicilar() {
-  return JSON.parse(fs.readFileSync(KULLANICI_YOLU, "utf8"));
+// Kullanıcı veri okuma/yazma
+function kullanicilariOku() {
+  if (!fs.existsSync(USERS_FILE)) return [];
+  const data = fs.readFileSync(USERS_FILE);
+  return JSON.parse(data);
 }
 
-function kullaniciKaydet(yeni) {
-  const mevcut = kayitliKullanicilar();
-  mevcut.push(yeni);
-  fs.writeFileSync(KULLANICI_YOLU, JSON.stringify(mevcut, null, 2), "utf8");
+function kullaniciYaz(user) {
+  const users = kullanicilariOku();
+  users.push(user);
+  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
-// Mesajları dosyaya kaydetme fonksiyonu
-const MESAJ_YOLU = path.join(__dirname, "mesajlar.json");
-if (fs.existsSync(MESAJ_YOLU)) {
-  try {
-    mesajlar = JSON.parse(fs.readFileSync(MESAJ_YOLU, "utf8"));
-  } catch (e) {
-    mesajlar = [];
-  }
-}
-function mesajKaydet() {
-  fs.writeFileSync(MESAJ_YOLU, JSON.stringify(mesajlar, null, 2), "utf8");
+// Mesaj veri okuma/yazma
+function mesajlariOku() {
+  if (!fs.existsSync(MESAJLAR_FILE)) return [];
+  const data = fs.readFileSync(MESAJLAR_FILE);
+  return JSON.parse(data);
 }
 
-// Kayıt
-app.post("/register", (req, res) => {
-  const { nickname, sifre, dogumtarihi } = req.body;
-  if (!nickname || !sifre || !dogumtarihi) return res.status(400).send("Eksik bilgi");
-  const varMi = kayitliKullanicilar().find(k => k.nickname === nickname);
-  if (varMi) return res.status(409).send("Zaten var");
-  kullaniciKaydet({ nickname, sifre, dogumtarihi });
-  req.session.kullanici = nickname;
-  res.sendStatus(200);
-});
+function mesajEkle(mesaj) {
+  const tum = mesajlariOku();
+  tum.push(mesaj);
+  fs.writeFileSync(MESAJLAR_FILE, JSON.stringify(tum, null, 2));
+}
 
-// Giriş
-app.post("/login", (req, res) => {
+// API - Giriş
+app.post("/giris", (req, res) => {
   const { nickname, sifre } = req.body;
-  const eslesen = kayitliKullanicilar().find(k => k.nickname === nickname && k.sifre === sifre);
-  if (!eslesen) return res.status(401).send("Hatalı giriş");
+  const users = kullanicilariOku();
+  const eslesen = users.find(u => u.nickname === nickname && u.sifre === sifre);
+
+  if (eslesen) {
+    req.session.kullanici = nickname;
+    return res.json({ basarili: true });
+  }
+  res.json({ basarili: false });
+});
+
+// API - Kayıt
+app.post("/kayit", (req, res) => {
+  const { nickname, sifre, dogum } = req.body;
+  const users = kullanicilariOku();
+  if (users.find(u => u.nickname === nickname)) {
+    return res.json({ basarili: false, mesaj: "Kullanıcı zaten var" });
+  }
+  kullaniciYaz({ nickname, sifre, dogum });
   req.session.kullanici = nickname;
-  res.sendStatus(200);
+  res.json({ basarili: true });
 });
 
-// Çıkış
-app.post("/logout", (req, res) => {
-  req.session.destroy(() => {
-    res.sendStatus(200);
-  });
-});
-
-// Kullanıcı bilgisi
+// API - Aktif kullanıcı
 app.get("/me", (req, res) => {
   if (req.session.kullanici) {
-    res.json({ kullanici: req.session.kullanici });
-  } else {
-    res.status(401).send("Giriş yok");
+    return res.json({ kullanici: req.session.kullanici });
   }
+  res.status(401).json({ mesaj: "Giriş yapılmamış" });
 });
 
-// Mesajları getir
+// API - Mesajları getir
 app.get("/mesajlar", (req, res) => {
-  res.json(mesajlar);
+  const veriler = mesajlariOku();
+  res.json(veriler);
 });
 
-// Gerçek zamanlı bağlantı
-io.on("connection", socket => {
-  socket.on("mesaj", veri => {
-    mesajlar.push(veri);
-    mesajKaydet();
+// API - Çıkış
+app.post("/cikis", (req, res) => {
+  req.session.destroy();
+  res.json({ cikis: true });
+});
+
+// SOCKET.IO
+io.on("connection", (socket) => {
+  console.log("📡 Yeni kullanıcı bağlandı");
+
+  socket.on("mesaj", (veri) => {
+    mesajEkle(veri);
     io.emit("mesaj", veri);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("🛑 Kullanıcı ayrıldı");
   });
 });
 
 http.listen(PORT, () => {
-  console.log(`🌸 Sunucu ${PORT} portunda çalışıyor`);
+  console.log(`🚀 Sunucu ${PORT} portunda çalışıyor`);
 });
