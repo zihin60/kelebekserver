@@ -7,5 +7,27 @@
 <body>
   <h1>Merhaba Kelebeğim</h1>
   <p>Bu sayfa senin için hazırlandı.</p>
+
+  <script>
+    const socket = new WebSocket("wss://kelebekserver.onrender.com");
+
+    socket.onopen = () => {
+      console.log("🔗 WebSocket bağlantısı açıldı.");
+      socket.send("🦋 Kelebek bağlandı!");
+    };
+
+    socket.onmessage = (event) => {
+      console.log("📨 Gelen mesaj:", event.data);
+      alert("Zeynep'ten mesaj var: " + event.data);
+    };
+
+    socket.onclose = () => {
+      console.log("❌ WebSocket bağlantısı kapandı.");
+    };
+
+    socket.onerror = (error) => {
+      console.error("⚠️ Hata oluştu:", error);
+    };
+  </script>
 </body>
 </html>
