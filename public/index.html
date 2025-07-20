@@ -64,21 +64,18 @@
 </head>
 <body>
 
-  <!-- Kelebek animasyonları -->
   <div class="kelebek" style="top: 10%; left: 5%;">🦋</div>
   <div class="kelebek" style="top: 20%; left: 15%; animation-delay: 1s;">🦋</div>
   <div class="kelebek" style="top: 30%; left: 25%; animation-delay: 2s;">🦋</div>
   <div class="kelebek" style="top: 40%; left: 35%; animation-delay: 3s;">🦋</div>
   <div class="kelebek" style="top: 50%; left: 45%; animation-delay: 4s;">🦋</div>
 
-  <!-- Giriş ekranı -->
   <div id="girisEkrani">
     <h2>İsim Gir</h2>
     <input type="text" id="kullaniciAdi" placeholder="Adınız" />
     <button onclick="girisYap()">Sohbete Başla</button>
   </div>
 
-  <!-- Sohbet ekranı -->
   <div id="sohbetEkrani">
     <h2>Sohbet</h2>
     <div id="mesajlar"></div>
@@ -86,18 +83,26 @@
     <button onclick="mesajGonder()">Gönder</button>
   </div>
 
-  <!-- Socket.io bağlantısı -->
   <script src="https://kelebekserver.onrender.com/socket.io/socket.io.js"></script>
   <script>
     const socket = io("https://kelebekserver.onrender.com");
-    let kullaniciAdi = "";
+    let kullaniciAdi = localStorage.getItem("kullaniciAdi") || "";
     let digerKullaniciAktif = false;
+
+    window.onload = () => {
+      if (kullaniciAdi) {
+        document.getElementById("girisEkrani").style.display = "none";
+        document.getElementById("sohbetEkrani").style.display = "block";
+        socket.emit("yeni-kullanici", kullaniciAdi);
+        mesajlariYukle();
+      }
+    };
 
     function girisYap() {
       const girilenAd = document.getElementById("kullaniciAdi").value.trim();
       if (girilenAd === "") return alert("Lütfen isim girin.");
       kullaniciAdi = girilenAd;
-
+      localStorage.setItem("kullaniciAdi", kullaniciAdi);
       socket.emit("yeni-kullanici", kullaniciAdi);
 
       const zaman = new Date().toLocaleTimeString("tr-TR", { hour: '2-digit', minute: '2-digit' });
@@ -112,16 +117,19 @@
       const metin = mesajInput.value.trim();
       if (metin === "") return;
       const zaman = new Date().toLocaleTimeString("tr-TR", { hour: '2-digit', minute: '2-digit' });
-      socket.emit("mesaj", { from: kullaniciAdi, to: "herkes", content: metin, zaman });
+      const mesaj = { from: kullaniciAdi, to: "herkes", content: metin, zaman };
+      socket.emit("mesaj", mesaj);
       mesajInput.value = "";
+      mesajEkle({ ...mesaj, id: Date.now().toString() });
+      kaydetMesaj(mesaj);
     }
 
     socket.on("mesaj", (veri) => {
       mesajEkle(veri);
-      // Sadece bu mesajı ben yazmadıysam ve başka kullanıcı varsa, görülme tetikle
       if (veri.id && veri.from !== kullaniciAdi && digerKullaniciAktif) {
         socket.emit("görüldü", veri.id);
       }
+      kaydetMesaj(veri);
     });
 
     socket.on("görüldü", (veri) => {
@@ -155,6 +163,17 @@
       div.innerHTML = `${veri.from} (${veri.zaman}): ${veri.content || veri.metin} ${tikHTML}`;
       mesajlar.appendChild(div);
       mesajlar.scrollTop = mesajlar.scrollHeight;
+    }
+
+    function kaydetMesaj(mesaj) {
+      let gecmis = JSON.parse(localStorage.getItem("mesajlar") || "[]");
+      gecmis.push(mesaj);
+      localStorage.setItem("mesajlar", JSON.stringify(gecmis));
+    }
+
+    function mesajlariYukle() {
+      let gecmis = JSON.parse(localStorage.getItem("mesajlar") || "[]");
+      gecmis.forEach(mesajEkle);
     }
   </script>
 
