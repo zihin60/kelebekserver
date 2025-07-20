@@ -26,14 +26,17 @@
       padding: 10px;
       font-size: 1rem;
       margin: 5px;
+      width: 90%;
+      max-width: 500px;
     }
     #mesajlar {
       border: 1px solid #ccc;
       padding: 10px;
       height: 300px;
-      overflow-y: scroll;
+      overflow-y: auto;
       margin-top: 10px;
       background: #f9f9f9;
+      width: 100%;
     }
     .mesaj {
       margin-bottom: 10px;
@@ -58,9 +61,11 @@
     <button onclick="mesajGonder()">Gönder</button>
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
+  <!-- !!! BUNU GÜNCELLE: Render backend URL'in neyse onu koy -->
+  <script src="https://kelebekserver.onrender.com/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
+    const socket = io("https://kelebekserver.onrender.com");
+
     let kullaniciAdi = "";
 
     function girisYap() {
