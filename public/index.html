@@ -7,12 +7,16 @@
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
     :root {
-      --bg: #1a1a1a;
-      --text: #f1f1f1;
-      --input-bg: #2a2a2a;
+      --bg-light: #fdf6fa;
+      --text-light: #222;
+      --input-bg-light: #fff;
+      --message-bg-light: #eee;
+      --bg-dark: #1a1a1a;
+      --text-dark: #f1f1f1;
+      --input-bg-dark: #2a2a2a;
+      --message-bg-dark: #333;
       --button-bg: #ff82bc;
       --button-hover: #e56fa8;
-      --message-bg: #333;
     }
 
     body {
@@ -26,6 +30,7 @@
       margin: 0;
       height: 100vh;
       overflow: hidden;
+      transition: background 0.3s, color 0.3s;
     }
     #girisEkrani, #sohbetEkrani {
       display: none;
@@ -35,6 +40,7 @@
       border-radius: 12px;
       padding: 20px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      transition: background 0.3s;
     }
     input, button {
       width: 100%;
@@ -43,6 +49,7 @@
       border: 1px solid #444;
       border-radius: 8px;
       font-size: 1rem;
+      transition: background 0.3s, color 0.3s;
     }
     input {
       background-color: var(--input-bg);
@@ -68,9 +75,21 @@
       overflow-y: auto;
       margin-bottom: 10px;
     }
+    #temaToggle {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      background: #555;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
+  <button id="temaToggle" onclick="temaDegistir()">🌙</button>
   <div id="girisEkrani">
     <h2 style="text-align:center;">🦋 Kelebek Sohbet</h2>
     <input type="text" id="nickname" placeholder="Kullanıcı Adı">
@@ -92,6 +111,35 @@
 
   <script>
     const socket = io("https://kelebekserver.onrender.com", { withCredentials: true });
+
+    function temaUygula(mod) {
+      const r = document.documentElement.style;
+      if (mod === 'dark') {
+        r.setProperty('--bg', 'var(--bg-dark)');
+        r.setProperty('--text', 'var(--text-dark)');
+        r.setProperty('--input-bg', 'var(--input-bg-dark)');
+        r.setProperty('--message-bg', 'var(--message-bg-dark)');
+        document.getElementById('temaToggle').innerText = '☀️';
+      } else {
+        r.setProperty('--bg', 'var(--bg-light)');
+        r.setProperty('--text', 'var(--text-light)');
+        r.setProperty('--input-bg', 'var(--input-bg-light)');
+        r.setProperty('--message-bg', 'var(--message-bg-light)');
+        document.getElementById('temaToggle').innerText = '🌙';
+      }
+    }
+
+    function temaDegistir() {
+      const mevcut = localStorage.getItem('tema') || 'dark';
+      const yeni = mevcut === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('tema', yeni);
+      temaUygula(yeni);
+    }
+
+    window.onload = () => {
+      temaUygula(localStorage.getItem('tema') || 'dark');
+      kontrolEt();
+    };
 
     async function kontrolEt() {
       const res = await fetch("https://kelebekserver.onrender.com/me", { credentials: "include" });
@@ -150,8 +198,6 @@
       div.innerText = `${data.from}: ${data.text}`;
       document.getElementById("mesajlar").appendChild(div);
     });
-
-    kontrolEt();
   </script>
 </body>
 </html>
