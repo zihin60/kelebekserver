@@ -27,6 +27,7 @@ app.use(session({
 app.use(express.static(path.join(__dirname, "public")));
 
 app.post("/register", (req, res) => {
+  console.log("Kayıt isteği geldi:", req.body);
   const { nickname, sifre, dogumtarihi } = req.body;
   if (!nickname || !sifre || !dogumtarihi) return res.status(400).send("Eksik bilgi");
   if (userDB[nickname]) return res.status(409).send("Bu kullanıcı zaten var.");
@@ -37,6 +38,7 @@ app.post("/register", (req, res) => {
 });
 
 app.post("/login", (req, res) => {
+  console.log("Giriş isteği geldi:", req.body);
   const { nickname, sifre } = req.body;
   if (!userDB[nickname] || userDB[nickname].sifre !== sifre) {
     return res.status(401).send("Giriş başarısız");
