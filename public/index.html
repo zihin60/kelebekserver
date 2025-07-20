@@ -1,35 +1,30 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Kelebek Sohbet</title>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(to right, #fef6ff, #ffeef7);
+      background: #fff8fc;
       color: #333;
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 20px;
-      height: 100vh;
-      margin: 0;
     }
-    .ekran {
+    #girisEkrani, #sohbetEkrani {
       display: none;
       width: 100%;
       max-width: 600px;
-      background: #fff;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
     input, button {
       padding: 10px;
       font-size: 1rem;
-      margin: 5px 0;
-      width: 100%;
+      margin: 5px;
+      width: 90%;
+      max-width: 500px;
     }
     #mesajlar {
       border: 1px solid #ccc;
@@ -37,102 +32,103 @@
       height: 300px;
       overflow-y: auto;
       background: #f9f9f9;
-      border-radius: 8px;
     }
     .mesaj {
       margin-bottom: 10px;
-      padding: 8px;
-      border-radius: 6px;
+      padding: 5px;
+      border-radius: 8px;
       background: #e0e7ff;
     }
   </style>
 </head>
 <body>
-  <div id="kayitEkrani" class="ekran">
+  <div id="girisEkrani">
     <h2>Kayıt Ol</h2>
-    <input type="text" id="kayitNick" placeholder="Nickname">
-    <input type="password" id="kayitSifre" placeholder="Şifre">
-    <input type="date" id="kayitDogum" placeholder="Doğum Tarihi">
+    <input id="kayitNick" placeholder="Nickname" />
+    <input id="kayitSifre" placeholder="Şifre" type="password" />
+    <input id="kayitDogum" placeholder="Doğum Tarihi" />
     <button onclick="kayitOl()">Kayıt Ol</button>
-    <p>Hesabın var mı? <a href="#" onclick="ekranGoster('girisEkrani')">Giriş yap</a></p>
-  </div>
-
-  <div id="girisEkrani" class="ekran">
-    <h2>Giriş Yap</h2>
-    <input type="text" id="girisNick" placeholder="Nickname">
-    <input type="password" id="girisSifre" placeholder="Şifre">
+    <h2>veya Giriş Yap</h2>
+    <input id="girisNick" placeholder="Nickname" />
+    <input id="girisSifre" placeholder="Şifre" type="password" />
     <button onclick="girisYap()">Giriş Yap</button>
-    <p>Hesabın yok mu? <a href="#" onclick="ekranGoster('kayitEkrani')">Kayıt ol</a></p>
   </div>
 
-  <div id="sohbetEkrani" class="ekran">
-    <h2>🦋 Kelebek Sohbet</h2>
+  <div id="sohbetEkrani">
+    <h2>Kelebek Sohbet</h2>
     <div id="mesajlar"></div>
-    <input type="text" id="mesajInput" placeholder="Mesaj yaz...">
+    <input id="mesajInput" placeholder="Mesaj yaz...">
     <button onclick="mesajGonder()">Gönder</button>
-    <button onclick="cikisYap()">Çıkış Yap</button>
+    <button onclick="cikisYap()">Çıkış</button>
   </div>
 
-  <script src="https://kelebekserver.onrender.com/socket.io/socket.io.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io("https://kelebekserver.onrender.com", { withCredentials: true });
-    let kullanici = "";
+    const socket = io();
+    let aktifKullanici = "";
 
-    async function kontrolEt() {
-      const res = await fetch("/me");
+    async function kayitOl() {
+      const nickname = document.getElementById("kayitNick").value;
+      const sifre = document.getElementById("kayitSifre").value;
+      const dogumtarihi = document.getElementById("kayitDogum").value;
+
+      const res = await fetch("/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nickname, sifre, dogumtarihi })
+      });
+
       if (res.ok) {
-        const veri = await res.json();
-        kullanici = veri.kullanici;
-        ekranGoster("sohbetEkrani");
-        socket.emit("yeni-kullanici", kullanici);
+        aktifKullanici = nickname;
+        girisYapildi();
       } else {
-        ekranGoster("girisEkrani");
+        alert("Kayıt başarısız: " + await res.text());
       }
     }
 
-    function ekranGoster(id) {
-      document.querySelectorAll('.ekran').forEach(e => e.style.display = "none");
-      document.getElementById(id).style.display = "block";
-    }
-
-    async function kayitOl() {
-      const nickname = document.getElementById("kayitNick").value.trim();
-      const sifre = document.getElementById("kayitSifre").value;
-      const dogumtarihi = document.getElementById("kayitDogum").value;
-      const res = await fetch("/register", {
-        method: "POST",
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nickname, sifre, dogumtarihi })
-      });
-      if (res.ok) location.reload();
-      else alert("Kayıt başarısız");
-    }
-
     async function girisYap() {
-      const nickname = document.getElementById("girisNick").value.trim();
+      const nickname = document.getElementById("girisNick").value;
       const sifre = document.getElementById("girisSifre").value;
+
       const res = await fetch("/login", {
         method: "POST",
-        headers: { 'Content-Type': 'application/json' },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nickname, sifre })
       });
-      if (res.ok) location.reload();
-      else alert("Giriş başarısız");
+
+      if (res.ok) {
+        aktifKullanici = nickname;
+        girisYapildi();
+      } else {
+        alert("Giriş başarısız: " + await res.text());
+      }
     }
 
     async function cikisYap() {
       await fetch("/logout", { method: "POST" });
-      ekranGoster("girisEkrani");
       location.reload();
+    }
+
+    async function kontrolEt() {
+      const res = await fetch("/me");
+      if (res.ok) {
+        const json = await res.json();
+        aktifKullanici = json.kullanici;
+        girisYapildi();
+      }
+    }
+
+    function girisYapildi() {
+      document.getElementById("girisEkrani").style.display = "none";
+      document.getElementById("sohbetEkrani").style.display = "block";
     }
 
     function mesajGonder() {
       const input = document.getElementById("mesajInput");
-      const text = input.value.trim();
-      if (text) {
-        socket.emit("mesaj", { text });
-        input.value = "";
-      }
+      const text = input.value;
+      if (text.trim() === "") return;
+      socket.emit("mesaj", { from: aktifKullanici, text });
+      input.value = "";
     }
 
     socket.on("mesaj", veri => {
