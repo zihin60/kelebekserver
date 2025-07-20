@@ -2,32 +2,85 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <title>Kelebek Server</title>
+  <title>KelebekServer</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; background: #fdf6f6; }
+    #messages { border: 1px solid #ccc; height: 200px; overflow-y: auto; padding: 10px; background: white; }
+    input { padding: 10px; width: 70%; }
+    button { padding: 10px; }
+  </style>
 </head>
 <body>
-  <h1>Merhaba Kelebeğim</h1>
-  <p>Bu sayfa senin için hazırlandı.</p>
+  <h1>🦋 Kelebek Sohbet</h1>
 
+  <div id="messages"></div>
+  <input id="messageInput" placeholder="Bir şeyler yaz...">
+  <button onclick="sendMessage()">Gönder</button>
+  <br><br>
+
+  <button onclick="startCall()">📞 Sesli Arama Başlat</button>
+  <audio id="remoteAudio" autoplay></audio>
+
+  <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = new WebSocket("wss://kelebekserver.onrender.com");
+    const socket = io();
+    const messages = document.getElementById("messages");
+    const input = document.getElementById("messageInput");
 
-    socket.onopen = () => {
-      console.log("🔗 WebSocket bağlantısı açıldı.");
-      socket.send("🦋 Kelebek bağlandı!");
+    // Mesaj gönder
+    function sendMessage() {
+      const msg = input.value;
+      socket.emit("chat message", msg);
+      appendMessage("Sen: " + msg);
+      input.value = "";
+    }
+
+    // Mesajları ekle
+    function appendMessage(msg) {
+      const div = document.createElement("div");
+      div.textContent = msg;
+      messages.appendChild(div);
+    }
+
+    // Gelen mesaj
+    socket.on("chat message", msg => {
+      appendMessage("Kelebeğin: " + msg);
+    });
+
+    // === WebRTC ===
+    const peer = new RTCPeerConnection();
+    const remoteAudio = document.getElementById("remoteAudio");
+
+    peer.ontrack = (event) => {
+      remoteAudio.srcObject = event.streams[0];
     };
 
-    socket.onmessage = (event) => {
-      console.log("📨 Gelen mesaj:", event.data);
-      alert("Zeynep'ten mesaj var: " + event.data);
-    };
+    navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(stream => {
+      stream.getTracks().forEach(track => peer.addTrack(track, stream));
+    });
 
-    socket.onclose = () => {
-      console.log("❌ WebSocket bağlantısı kapandı.");
-    };
+    socket.on("incomingCall", fromId => {
+      peer.createOffer().then(offer => {
+        return peer.setLocalDescription(offer).then(() => {
+          socket.emit("signal", { to: fromId, signal: peer.localDescription });
+        });
+      });
+    });
 
-    socket.onerror = (error) => {
-      console.error("⚠️ Hata oluştu:", error);
-    };
+    socket.on("signal", async ({ from, signal }) => {
+      if (signal.type === "offer") {
+        await peer.setRemoteDescription(new RTCSessionDescription(signal));
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        socket.emit("signal", { to: from, signal: peer.localDescription });
+      } else if (signal.type === "answer") {
+        await peer.setRemoteDescription(new RTCSessionDescription(signal));
+      }
+    });
+
+    function startCall() {
+      socket.emit("call", socket.id); // Kendine çağrı yolla (tek kişilik test için)
+    }
   </script>
 </body>
 </html>
