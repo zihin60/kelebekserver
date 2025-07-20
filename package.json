@@ -1,7 +1,7 @@
 {
   "name": "kelebekserver",
-  "version": "1.1.0",
-  "description": "Kelebek Chat Sunucusu - Girişli ve Kalıcı Oturumlu",
+  "version": "1.2.0",
+  "description": "Kelebek Chat Sunucusu - Hesaplı Giriş Sistemi",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -11,7 +11,9 @@
     "socket.io": "^4.7.5",
     "express-session": "^1.17.3",
     "body-parser": "^1.20.2",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "bcrypt": "^5.1.0",
+    "fs-extra": "^11.1.1"
   },
   "engines": {
     "node": ">=16.x"
