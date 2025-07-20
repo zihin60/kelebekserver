@@ -8,41 +8,70 @@
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: #fff8fc;
+      background: linear-gradient(to bottom right, #ffeaf7, #f8faff);
       color: #333;
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 20px;
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
     }
     #girisEkrani, #sohbetEkrani {
       display: none;
       width: 100%;
-      max-width: 600px;
+      max-width: 400px;
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+    button {
+      background: #ff82bc;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #e56fa8;
     }
     .mesaj {
-      padding: 5px;
-      margin: 5px 0;
-      background: #eef;
-      border-radius: 4px;
+      padding: 8px;
+      margin: 6px 0;
+      background: #f0f4ff;
+      border-radius: 8px;
+    }
+    #mesajlar {
+      max-height: 400px;
+      overflow-y: auto;
+      margin-bottom: 10px;
     }
   </style>
 </head>
 <body>
   <div id="girisEkrani">
-    <h2>Kelebek Sohbet Giriş</h2>
-    <input type="text" id="nickname" placeholder="Kullanıcı Adı"><br>
-    <input type="password" id="sifre" placeholder="Şifre"><br>
+    <h2 style="text-align:center;">🦋 Kelebek Sohbet</h2>
+    <input type="text" id="nickname" placeholder="Kullanıcı Adı">
+    <input type="password" id="sifre" placeholder="Şifre">
     <button onclick="girisYap()">Giriş Yap</button>
-    <h3>veya Kayıt Ol</h3>
-    <input type="text" id="kayitAd" placeholder="Yeni Kullanıcı Adı"><br>
-    <input type="password" id="kayitSifre" placeholder="Şifre"><br>
-    <input type="date" id="dogumTarihi" placeholder="Doğum Tarihi"><br>
+    <h3 style="text-align:center;">veya Kayıt Ol</h3>
+    <input type="text" id="kayitAd" placeholder="Yeni Kullanıcı Adı">
+    <input type="password" id="kayitSifre" placeholder="Şifre">
+    <input type="date" id="dogumTarihi">
     <button onclick="kayitOl()">Kayıt Ol</button>
   </div>
 
   <div id="sohbetEkrani">
-    <h2>Sohbet</h2>
+    <h2 style="text-align:center;">Sohbet Odası</h2>
     <div id="mesajlar"></div>
     <input type="text" id="mesajInput" placeholder="Mesaj...">
     <button onclick="mesajGonder()">Gönder</button>
