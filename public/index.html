@@ -76,6 +76,7 @@
       if (res.ok) {
         const data = await res.json();
         kullanici = data.kullanici;
+        window.kullanici = data.kullanici; // GLOBAL ATAMA
         document.getElementById("girisEkrani").style.display = "none";
         document.getElementById("sohbetEkrani").style.display = "block";
         eskiMesajlariYukle();
@@ -125,7 +126,7 @@
       const metin = mesajInput.value.trim();
       if (!metin) return;
       const zaman = new Date().toLocaleTimeString("tr-TR", { hour: '2-digit', minute: '2-digit' });
-      socket.emit("mesaj", { isim: kullanici, metin, zaman });
+      socket.emit("mesaj", { isim: window.kullanici || kullanici, metin, zaman });
       mesajInput.value = "";
     }
 
