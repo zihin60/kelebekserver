@@ -1,157 +1,145 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Kelebek Sohbet</title>
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(to bottom right, #ffeaf7, #f8faff);
+      background: linear-gradient(to right, #fef6ff, #ffeef7);
       color: #333;
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 20px;
-      margin: 0;
       height: 100vh;
-      overflow: hidden;
+      margin: 0;
     }
-    #girisEkrani, #sohbetEkrani {
+    .ekran {
       display: none;
       width: 100%;
-      max-width: 400px;
-      background: white;
-      border-radius: 12px;
+      max-width: 600px;
+      background: #fff;
       padding: 20px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
     input, button {
-      width: 100%;
       padding: 10px;
-      margin: 8px 0;
-      border: 1px solid #ccc;
-      border-radius: 8px;
       font-size: 1rem;
-    }
-    button {
-      background: #ff82bc;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #e56fa8;
-    }
-    .mesaj {
-      padding: 8px;
-      margin: 6px 0;
-      background: #f0f4ff;
-      border-radius: 8px;
+      margin: 5px 0;
+      width: 100%;
     }
     #mesajlar {
-      max-height: 400px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      height: 300px;
       overflow-y: auto;
+      background: #f9f9f9;
+      border-radius: 8px;
+    }
+    .mesaj {
       margin-bottom: 10px;
+      padding: 8px;
+      border-radius: 6px;
+      background: #e0e7ff;
     }
   </style>
 </head>
 <body>
-  <div id="girisEkrani">
-    <h2 style="text-align:center;">🦋 Kelebek Sohbet</h2>
-    <input type="text" id="nickname" placeholder="Kullanıcı Adı">
-    <input type="password" id="sifre" placeholder="Şifre">
-    <button onclick="girisYap()">Giriş Yap</button>
-    <h3 style="text-align:center;">veya Kayıt Ol</h3>
-    <input type="text" id="kayitAd" placeholder="Yeni Kullanıcı Adı">
+  <div id="kayitEkrani" class="ekran">
+    <h2>Kayıt Ol</h2>
+    <input type="text" id="kayitNick" placeholder="Nickname">
     <input type="password" id="kayitSifre" placeholder="Şifre">
-    <input type="date" id="dogumTarihi">
+    <input type="date" id="kayitDogum" placeholder="Doğum Tarihi">
     <button onclick="kayitOl()">Kayıt Ol</button>
+    <p>Hesabın var mı? <a href="#" onclick="ekranGoster('girisEkrani')">Giriş yap</a></p>
   </div>
 
-  <div id="sohbetEkrani">
-    <h2 style="text-align:center;">Sohbet Odası</h2>
+  <div id="girisEkrani" class="ekran">
+    <h2>Giriş Yap</h2>
+    <input type="text" id="girisNick" placeholder="Nickname">
+    <input type="password" id="girisSifre" placeholder="Şifre">
+    <button onclick="girisYap()">Giriş Yap</button>
+    <p>Hesabın yok mu? <a href="#" onclick="ekranGoster('kayitEkrani')">Kayıt ol</a></p>
+  </div>
+
+  <div id="sohbetEkrani" class="ekran">
+    <h2>🦋 Kelebek Sohbet</h2>
     <div id="mesajlar"></div>
-    <input type="text" id="mesajInput" placeholder="Mesaj...">
+    <input type="text" id="mesajInput" placeholder="Mesaj yaz...">
     <button onclick="mesajGonder()">Gönder</button>
-    <button onclick="cikisYap()" style="margin-top:10px; background:#ddd; color:#000;">Çıkış Yap</button>
-    <div id="kullaniciListesi" style="margin-top:10px; font-size:0.9rem; color:#555;"></div>
+    <button onclick="cikisYap()">Çıkış Yap</button>
   </div>
 
+  <script src="https://kelebekserver.onrender.com/socket.io/socket.io.js"></script>
   <script>
-    const socket = io("https://kelebekserver.onrender.com");
+    const socket = io("https://kelebekserver.onrender.com", { withCredentials: true });
+    let kullanici = "";
 
     async function kontrolEt() {
-      const res = await fetch("https://kelebekserver.onrender.com/me", { credentials: "include" });
+      const res = await fetch("/me");
       if (res.ok) {
-        const data = await res.json();
-        baslatSohbet(data.kullanici);
+        const veri = await res.json();
+        kullanici = veri.kullanici;
+        ekranGoster("sohbetEkrani");
+        socket.emit("yeni-kullanici", kullanici);
       } else {
-        document.getElementById("girisEkrani").style.display = "block";
+        ekranGoster("girisEkrani");
       }
     }
 
+    function ekranGoster(id) {
+      document.querySelectorAll('.ekran').forEach(e => e.style.display = "none");
+      document.getElementById(id).style.display = "block";
+    }
+
     async function kayitOl() {
-      const nickname = document.getElementById("kayitAd").value;
+      const nickname = document.getElementById("kayitNick").value.trim();
       const sifre = document.getElementById("kayitSifre").value;
-      const dogumtarihi = document.getElementById("dogumTarihi").value;
-      const res = await fetch("https://kelebekserver.onrender.com/register", {
+      const dogumtarihi = document.getElementById("kayitDogum").value;
+      const res = await fetch("/register", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nickname, sifre, dogumtarihi })
       });
-      if (res.ok) baslatSohbet(nickname);
-      else alert(await res.text());
+      if (res.ok) location.reload();
+      else alert("Kayıt başarısız");
     }
 
     async function girisYap() {
-      const nickname = document.getElementById("nickname").value;
-      const sifre = document.getElementById("sifre").value;
-      const res = await fetch("https://kelebekserver.onrender.com/login", {
+      const nickname = document.getElementById("girisNick").value.trim();
+      const sifre = document.getElementById("girisSifre").value;
+      const res = await fetch("/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nickname, sifre })
       });
-      if (res.ok) baslatSohbet(nickname);
-      else alert(await res.text());
+      if (res.ok) location.reload();
+      else alert("Giriş başarısız");
     }
 
-    function baslatSohbet(kullanici) {
-      document.getElementById("girisEkrani").style.display = "none";
-      document.getElementById("sohbetEkrani").style.display = "block";
-      socket.emit("yeni-kullanici", kullanici);
+    async function cikisYap() {
+      await fetch("/logout", { method: "POST" });
+      ekranGoster("girisEkrani");
+      location.reload();
     }
 
     function mesajGonder() {
       const input = document.getElementById("mesajInput");
-      const mesaj = input.value.trim();
-      if (!mesaj) return;
-      socket.emit("mesaj", { from: "Ben", text: mesaj });
-      input.value = "";
+      const text = input.value.trim();
+      if (text) {
+        socket.emit("mesaj", { text });
+        input.value = "";
+      }
     }
 
-    function cikisYap() {
-      fetch("https://kelebekserver.onrender.com/logout", {
-        method: "POST",
-        credentials: "include"
-      }).then(() => {
-        location.reload();
-      });
-    }
-
-    socket.on("mesaj", (data) => {
+    socket.on("mesaj", veri => {
       const div = document.createElement("div");
       div.className = "mesaj";
-      div.innerText = `${data.from}: ${data.text}`;
+      div.innerText = `${veri.from}: ${veri.text}`;
       document.getElementById("mesajlar").appendChild(div);
-    });
-
-    socket.on("kullanici-listesi", (liste) => {
-      const div = document.getElementById("kullaniciListesi");
-      div.innerText = "Çevrim içi: " + liste.join(", ");
     });
 
     kontrolEt();
