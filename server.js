@@ -2,6 +2,7 @@ const express = require("express");
 const app = express();
 const http = require("http").createServer(app);
 const path = require("path");
+const fs = require("fs");
 const io = require("socket.io")(http, {
   cors: {
     origin: "*"
@@ -9,7 +10,12 @@ const io = require("socket.io")(http, {
 });
 const PORT = process.env.PORT || 3000;
 
+// LOG sistemleri
 const logs = [];
+
+// MESAJ ve KULLANICI VERİSİ
+const messages = []; // Mesajları burada saklıyoruz
+const connectedUsers = new Set(); // Çevrimiçi kullanıcı listesi
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -37,17 +43,64 @@ app.get("/admin", (req, res) => {
   }
 });
 
-// Gerçek zamanlı mesajlaşma
+// SOCKET.IO – Gerçek zamanlı mesajlaşma
 io.on("connection", (socket) => {
-  console.log("Bir kullanıcı bağlandı.");
+  console.log("🔌 Bir kullanıcı bağlandı.");
 
-  // Yeni kullanıcı adı alındıysa, kullanıcı adını socket'e yaz
-  socket.on("mesaj", (data) => {
-    io.emit("mesaj", data); // Tüm istemcilere mesajı yayınla
+  let currentUsername = null;
+
+  // Kullanıcı adını alınca kaydet
+  socket.on("yeni-kullanici", (username) => {
+    currentUsername = username;
+    connectedUsers.add(username);
+    console.log(`👤 ${username} bağlandı.`);
+    // (bir sonraki adımda çevrimiçi durumu yayılacak)
   });
 
+  // MESAJ ALDIĞIMIZDA
+  socket.on("mesaj", (data) => {
+    const message = {
+      id: Date.now().toString(),
+      from: data.from,
+      to: data.to,
+      content: data.content,
+      timestamp: new Date().toISOString(),
+      seen: false
+    };
+
+    messages.push(message);
+
+    // Mesajları JSON dosyasına kaydet (ileride Mongo yapılabilir)
+    fs.writeFileSync("messages.json", JSON.stringify(messages, null, 2));
+
+    io.emit("mesaj", message); // herkese yay
+  });
+
+  // GÖRÜLDÜ BİLGİSİ
+  socket.on("görüldü", (messageId) => {
+    const msg = messages.find(m => m.id === messageId);
+    if (msg) {
+      msg.seen = true;
+
+      fs.writeFileSync("messages.json", JSON.stringify(messages, null, 2));
+
+      io.emit("görüldü", {
+        messageId: msg.id,
+        seenBy: msg.to,
+        time: new Date().toISOString()
+      });
+    }
+  });
+
+  // BAĞLANTI KESİLDİĞİNDE
   socket.on("disconnect", () => {
-    console.log("Kullanıcı ayrıldı.");
+    if (currentUsername) {
+      connectedUsers.delete(currentUsername);
+      console.log(`❌ ${currentUsername} ayrıldı.`);
+      // (bir sonraki adımda offline durumu yayılacak)
+    } else {
+      console.log("Bir kullanıcı ayrıldı.");
+    }
   });
 });
 
