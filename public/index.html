@@ -39,6 +39,10 @@
       border-radius: 8px;
       background: #e0e7ff;
     }
+    .hata {
+      color: red;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -52,6 +56,7 @@
     <input id="girisNick" placeholder="Nickname" />
     <input id="girisSifre" placeholder="Şifre" type="password" />
     <button onclick="girisYap()">Giriş Yap</button>
+    <div id="hataMesaji" class="hata"></div>
   </div>
 
   <div id="sohbetEkrani">
@@ -72,17 +77,22 @@
       const sifre = document.getElementById("kayitSifre").value;
       const dogumtarihi = document.getElementById("kayitDogum").value;
 
-      const res = await fetch("/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nickname, sifre, dogumtarihi })
-      });
+      try {
+        const res = await fetch("/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nickname, sifre, dogumtarihi })
+        });
 
-      if (res.ok) {
-        aktifKullanici = nickname;
-        girisYapildi();
-      } else {
-        alert("Kayıt başarısız: " + await res.text());
+        if (res.ok) {
+          aktifKullanici = nickname;
+          girisYapildi();
+        } else {
+          const hata = await res.text();
+          document.getElementById("hataMesaji").innerText = "Kayıt başarısız: " + hata;
+        }
+      } catch (e) {
+        document.getElementById("hataMesaji").innerText = "Sunucuya bağlanılamadı.";
       }
     }
 
@@ -90,17 +100,22 @@
       const nickname = document.getElementById("girisNick").value;
       const sifre = document.getElementById("girisSifre").value;
 
-      const res = await fetch("/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nickname, sifre })
-      });
+      try {
+        const res = await fetch("/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nickname, sifre })
+        });
 
-      if (res.ok) {
-        aktifKullanici = nickname;
-        girisYapildi();
-      } else {
-        alert("Giriş başarısız: " + await res.text());
+        if (res.ok) {
+          aktifKullanici = nickname;
+          girisYapildi();
+        } else {
+          const hata = await res.text();
+          document.getElementById("hataMesaji").innerText = "Giriş başarısız: " + hata;
+        }
+      } catch (e) {
+        document.getElementById("hataMesaji").innerText = "Sunucuya bağlanılamadı.";
       }
     }
 
@@ -110,11 +125,18 @@
     }
 
     async function kontrolEt() {
-      const res = await fetch("/me");
-      if (res.ok) {
-        const json = await res.json();
-        aktifKullanici = json.kullanici;
-        girisYapildi();
+      try {
+        const res = await fetch("/me");
+        if (res.ok) {
+          const json = await res.json();
+          aktifKullanici = json.kullanici;
+          girisYapildi();
+        } else {
+          document.getElementById("girisEkrani").style.display = "block";
+        }
+      } catch (e) {
+        document.getElementById("hataMesaji").innerText = "Sunucuya bağlanılamadı.";
+        document.getElementById("girisEkrani").style.display = "block";
       }
     }
 
