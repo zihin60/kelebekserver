@@ -2,65 +2,95 @@ const express = require("express");
 const app = express();
 const http = require("http").createServer(app);
 const io = require("socket.io")(http, {
-  cors: { origin: "*" }
+  cors: {
+    origin: "*",
+    credentials: true
+  }
 });
-const cors = require("cors");
+const path = require("path");
 const session = require("express-session");
 const cookieParser = require("cookie-parser");
 
-app.use(express.json());
+const PORT = process.env.PORT || 3000;
+
+let kullanicilar = [];
+const userDB = {}; // geçici kullanıcı veritabanı (RAM'de tutulur)
+const mesajlar = {}; // kullanıcıya özel mesajlar
+
 app.use(cookieParser());
-app.use(cors({ origin: true, credentials: true }));
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
 app.use(session({
-  secret: "kelebek-secret",
+  secret: "kelebek-gizli",
   resave: false,
-  saveUninitialized: true,
-  cookie: { secure: false, maxAge: 86400000 }
+  saveUninitialized: false,
+  cookie: { secure: false } // production'da true (https) olmalı
 }));
 
-const kullanicilar = {}; // { nickname: { sifre, dogumtarihi } }
-const sohbetler = {};    // { nickname: [mesajlar] }
-
+// Kayıt
 app.post("/register", (req, res) => {
   const { nickname, sifre, dogumtarihi } = req.body;
-  if (kullanicilar[nickname]) return res.status(409).send("Kullanıcı zaten var");
-  kullanicilar[nickname] = { sifre, dogumtarihi };
-  sohbetler[nickname] = [];
+  if (userDB[nickname]) return res.status(409).send("Bu kullanıcı zaten var.");
+  userDB[nickname] = { sifre, dogumtarihi };
   req.session.kullanici = nickname;
+  mesajlar[nickname] = [];
   res.sendStatus(200);
 });
 
+// Giriş
 app.post("/login", (req, res) => {
   const { nickname, sifre } = req.body;
-  if (!kullanicilar[nickname] || kullanicilar[nickname].sifre !== sifre)
-    return res.status(401).send("Geçersiz giriş");
+  if (!userDB[nickname] || userDB[nickname].sifre !== sifre)
+    return res.status(401).send("Hatalı giriş bilgileri.");
   req.session.kullanici = nickname;
   res.sendStatus(200);
 });
 
+// Aktif kullanıcıyı getir
 app.get("/me", (req, res) => {
-  if (!req.session.kullanici) return res.status(401).send("Çıkış yapılmış");
-  res.json({ kullanici: req.session.kullanici });
+  if (req.session.kullanici) {
+    res.json({ kullanici: req.session.kullanici });
+  } else {
+    res.sendStatus(401);
+  }
+});
+
+// Çıkış
+app.post("/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.clearCookie("connect.sid");
+    res.sendStatus(200);
+  });
 });
 
 io.on("connection", (socket) => {
-  let aktifKullanici = null;
+  let kullanici = null;
 
-  socket.on("yeni-kullanici", (nickname) => {
-    aktifKullanici = nickname;
-    if (sohbetler[nickname]) {
-      sohbetler[nickname].forEach(msg => {
-        socket.emit("mesaj", msg);
+  socket.on("yeni-kullanici", (isim) => {
+    kullanici = isim;
+    if (!kullanicilar.includes(kullanici)) kullanicilar.push(kullanici);
+    io.emit("kullanici-listesi", kullanicilar);
+    if (mesajlar[kullanici]) {
+      mesajlar[kullanici].forEach(m => {
+        socket.emit("mesaj", m);
       });
     }
   });
 
   socket.on("mesaj", (data) => {
-    if (!aktifKullanici) return;
-    const mesaj = { from: aktifKullanici, text: data.text };
-    sohbetler[aktifKullanici].push(mesaj);
+    const mesaj = { from: kullanici, text: data.text };
+    if (mesajlar[kullanici]) mesajlar[kullanici].push(mesaj);
     io.emit("mesaj", mesaj);
+  });
+
+  socket.on("disconnect", () => {
+    if (kullanici) {
+      kullanicilar = kullanicilar.filter(k => k !== kullanici);
+      io.emit("kullanici-listesi", kullanicilar);
+    }
   });
 });
 
-http.listen(3000, () => console.log("Sunucu 3000 portunda hazır!"));
+http.listen(PORT, () => {
+  console.log(`🚀 Sunucu ${PORT} portunda çalışıyor`);
+});
