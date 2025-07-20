@@ -10,7 +10,7 @@
       --bg-light: #fdf6fa;
       --text-light: #222;
       --input-bg-light: #fff;
-      --message-bg-light: #eee;
+      --message-bg-light: #e0f4f9;
       --bg-dark: #1a1a1a;
       --text-dark: #f1f1f1;
       --input-bg-dark: #2a2a2a;
@@ -19,78 +19,99 @@
       --button-hover: #e56fa8;
     }
 
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       font-family: 'Segoe UI', sans-serif;
       background: var(--bg);
       color: var(--text);
+      margin: 0;
+      padding: 0;
+      height: 100vh;
       display: flex;
       flex-direction: column;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
       align-items: center;
-      padding: 20px;
+      padding: 10px 15px;
+      background: var(--message-bg);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+
+    header h2 {
       margin: 0;
-      height: 100vh;
-      overflow: hidden;
-      transition: background 0.3s, color 0.3s;
+      font-size: 1.1rem;
     }
-    #girisEkrani, #sohbetEkrani {
-      display: none;
-      width: 100%;
-      max-width: 400px;
-      background: #222;
-      border-radius: 12px;
-      padding: 20px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-      transition: background 0.3s;
-    }
-    input, button {
-      width: 100%;
-      padding: 10px;
-      margin: 8px 0;
-      border: 1px solid #444;
-      border-radius: 8px;
-      font-size: 1rem;
-      transition: background 0.3s, color 0.3s;
-    }
-    input {
-      background-color: var(--input-bg);
+
+    #temaToggle {
+      background: transparent;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
       color: var(--text);
     }
+
+    #girisEkrani, #sohbetEkrani {
+      margin: auto;
+      width: 100%;
+      max-width: 500px;
+      padding: 20px;
+    }
+
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 8px;
+      border: none;
+      font-size: 1rem;
+    }
+
+    input {
+      background: var(--input-bg);
+      color: var(--text);
+    }
+
     button {
       background: var(--button-bg);
       color: white;
-      border: none;
-      cursor: pointer;
     }
+
     button:hover {
       background: var(--button-hover);
     }
+
     .mesaj {
-      padding: 8px;
-      margin: 6px 0;
       background: var(--message-bg);
+      padding: 10px;
+      margin: 5px 0;
       border-radius: 8px;
     }
+
     #mesajlar {
-      max-height: 400px;
+      max-height: 60vh;
       overflow-y: auto;
       margin-bottom: 10px;
     }
-    #temaToggle {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      padding: 6px 10px;
-      border-radius: 6px;
-      background: #555;
-      color: white;
-      border: none;
-      cursor: pointer;
-      transition: background 0.3s;
+
+    .status {
+      font-size: 0.9rem;
+      opacity: 0.7;
     }
   </style>
 </head>
 <body>
-  <button id="temaToggle" onclick="temaDegistir()">🌙</button>
+  <header>
+    <h2 id="kullaniciBilgi">Kelebek</h2>
+    <button id="temaToggle" onclick="temaDegistir()">🌙</button>
+  </header>
+
   <div id="girisEkrani">
     <h2 style="text-align:center;">🦋 Kelebek Sohbet</h2>
     <input type="text" id="nickname" placeholder="Kullanıcı Adı">
@@ -103,11 +124,11 @@
     <button onclick="kayitOl()">Kayıt Ol</button>
   </div>
 
-  <div id="sohbetEkrani">
-    <h2 style="text-align:center;">Sohbet Odası</h2>
+  <div id="sohbetEkrani" style="display:none">
     <div id="mesajlar"></div>
     <input type="text" id="mesajInput" placeholder="Mesaj...">
     <button onclick="mesajGonder()">Gönder</button>
+    <button onclick="cikisYap()">Çıkış Yap</button>
   </div>
 
   <script>
@@ -182,7 +203,15 @@
     function baslatSohbet(kullanici) {
       document.getElementById("girisEkrani").style.display = "none";
       document.getElementById("sohbetEkrani").style.display = "block";
+      document.getElementById("kullaniciBilgi").innerText = `${kullanici} (Aktif)`;
       socket.emit("yeni-kullanici", kullanici);
+    }
+
+    function cikisYap() {
+      fetch("https://kelebekserver.onrender.com/logout", {
+        method: "POST",
+        credentials: "include"
+      }).then(() => location.reload());
     }
 
     function mesajGonder() {
