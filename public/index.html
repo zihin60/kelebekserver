@@ -91,7 +91,7 @@
   </div>
 
   <script>
-    const socket = io("https://kelebekserver.onrender.com");
+    const socket = io("https://kelebekserver.onrender.com", { withCredentials: true });
 
     async function kontrolEt() {
       const res = await fetch("https://kelebekserver.onrender.com/me", { credentials: "include" });
