@@ -60,18 +60,21 @@
 </head>
 <body>
 
+  <!-- Kelebek animasyonları -->
   <div class="kelebek" style="top: 10%; left: 5%;">🦋</div>
   <div class="kelebek" style="top: 20%; left: 15%; animation-delay: 1s;">🦋</div>
   <div class="kelebek" style="top: 30%; left: 25%; animation-delay: 2s;">🦋</div>
   <div class="kelebek" style="top: 40%; left: 35%; animation-delay: 3s;">🦋</div>
   <div class="kelebek" style="top: 50%; left: 45%; animation-delay: 4s;">🦋</div>
 
+  <!-- Giriş ekranı -->
   <div id="girisEkrani">
     <h2>İsim Gir</h2>
     <input type="text" id="kullaniciAdi" placeholder="Adınız" />
     <button onclick="girisYap()">Sohbete Başla</button>
   </div>
 
+  <!-- Sohbet ekranı -->
   <div id="sohbetEkrani">
     <h2>Sohbet</h2>
     <div id="mesajlar"></div>
@@ -79,15 +82,21 @@
     <button onclick="mesajGonder()">Gönder</button>
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
+  <!-- Socket.io bağlantısı -->
+  <script src="https://kelebekserver.onrender.com/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
+    const socket = io("https://kelebekserver.onrender.com");
     let kullaniciAdi = "";
 
     function girisYap() {
       const girilenAd = document.getElementById("kullaniciAdi").value.trim();
       if (girilenAd === "") return alert("Lütfen isim girin.");
       kullaniciAdi = girilenAd;
+
+      // Giriş yaptıktan sonra "hoş geldin" tarzı başlangıç mesajı istersen:
+      const zaman = new Date().toLocaleTimeString("tr-TR", { hour: '2-digit', minute: '2-digit' });
+      socket.emit("mesaj", { metin: `${kullaniciAdi} sohbete katıldı`, isim: "Sistem", zaman });
+
       document.getElementById("girisEkrani").style.display = "none";
       document.getElementById("sohbetEkrani").style.display = "block";
     }
@@ -96,7 +105,8 @@
       const mesajInput = document.getElementById("mesajInput");
       const metin = mesajInput.value.trim();
       if (metin === "") return;
-      socket.emit("mesaj", { metin, isim: kullaniciAdi });
+      const zaman = new Date().toLocaleTimeString("tr-TR", { hour: '2-digit', minute: '2-digit' });
+      socket.emit("mesaj", { metin, isim: kullaniciAdi, zaman });
       mesajInput.value = "";
     }
 
