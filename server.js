@@ -1,91 +1,124 @@
-// GÜNCELLENMİŞ VE GELİŞMİŞ SUNUCU KODU
-const express = require("express");
-const session = require("express-session");
-const cors = require("cors");
-const path = require("path");
-const fs = require("fs");
-const bodyParser = require("body-parser");
-const app = express();
-const http = require("http").createServer(app);
-const io = require("socket.io")(http, {
-  cors: { origin: "*", credentials: true }
-});
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kelebek Sohbet</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    /* ... stil ayarları aynı kalıyor ... */
+  </style>
+</head>
+<body>
+  <button id="temaToggle" onclick="temaDegistir()">🌙</button>
+  <div id="girisEkrani">
+    <!-- ... giriş alanları ... -->
+  </div>
 
-const PORT = process.env.PORT || 3000;
-const USERS_FILE = path.join(__dirname, "users.json");
-const MESAJLAR_FILE = path.join(__dirname, "mesajlar.json");
+  <div id="kisiSecEkrani">
+    <h2>Kişi Seç</h2>
+    <input type="text" id="aranacakKisi" placeholder="Kullanıcı ara...">
+    <button onclick="kisiSec()">Sohbete Başla</button>
+  </div>
 
-app.use(cors({ origin: true, credentials: true }));
-app.use(express.static(path.join(__dirname, "public")));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(session({
-  secret: "kelebek-secret",
-  resave: false,
-  saveUninitialized: true,
-  cookie: { maxAge: 1000 * 60 * 60 * 24 * 365 } // 1 yıl saklama
-}));
+  <div id="sohbetEkrani">
+    <h2 style="text-align:center;" id="kullaniciBaslik">Sohbet</h2>
+    <div id="mesajlar"></div>
+    <input type="text" id="mesajInput" placeholder="Mesaj...">
+    <button type="button" onclick="mesajGonder()">Gönder</button>
+  </div>
 
-function okuJSON(dosya) {
-  if (!fs.existsSync(dosya)) return [];
-  return JSON.parse(fs.readFileSync(dosya));
-}
-function yazJSON(dosya, veri) {
-  fs.writeFileSync(dosya, JSON.stringify(veri, null, 2));
-}
+  <script>
+    const socket = io("https://kelebekserver.onrender.com", { withCredentials: true });
+    let seciliKisi = "";
+    let ben = "";
 
-// Kullanıcılar
-dunction kaydetKullanici(user) {
-  const tum = okuJSON(USERS_FILE);
-  tum.push(user);
-  yazJSON(USERS_FILE, tum);
-}
+    function temaUygula(mod) {
+      // ...
+    }
 
-app.post("/register", (req, res) => {
-  const { nickname, sifre, dogumtarihi } = req.body;
-  const tum = okuJSON(USERS_FILE);
-  if (tum.find(u => u.nickname === nickname)) return res.status(400).send("Kullanıcı zaten var");
-  kaydetKullanici({ nickname, sifre, dogumtarihi });
-  req.session.kullanici = nickname;
-  res.sendStatus(200);
-});
+    function temaDegistir() {
+      // ...
+    }
 
-app.post("/login", (req, res) => {
-  const { nickname, sifre } = req.body;
-  const tum = okuJSON(USERS_FILE);
-  if (!tum.find(u => u.nickname === nickname && u.sifre === sifre)) return res.status(401).send("Geçersiz bilgi");
-  req.session.kullanici = nickname;
-  res.sendStatus(200);
-});
+    window.onload = () => {
+      temaUygula(localStorage.getItem('tema') || 'dark');
+      kontrolEt();
+    };
 
-app.get("/me", (req, res) => {
-  if (!req.session.kullanici) return res.status(401).json({ hata: "Oturum yok" });
-  res.json({ kullanici: req.session.kullanici });
-});
+    async function kontrolEt() {
+      const res = await fetch("https://kelebekserver.onrender.com/me", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        ben = data.nickname;
+        document.getElementById("girisEkrani").style.display = "none";
+        document.getElementById("kisiSecEkrani").style.display = "block";
+      } else {
+        document.getElementById("girisEkrani").style.display = "block";
+      }
+    }
 
-app.get("/kullanicilar", (req, res) => {
-  const tum = okuJSON(USERS_FILE);
-  res.json(tum.map(u => u.nickname));
-});
+    async function kayitOl() {
+      // ...
+    }
 
-app.get("/mesajlar/:kisi1/:kisi2", (req, res) => {
-  const { kisi1, kisi2 } = req.params;
-  const tum = okuJSON(MESAJLAR_FILE);
-  const filtreli = tum.filter(m =>
-    (m.from === kisi1 && m.to === kisi2) || (m.from === kisi2 && m.to === kisi1)
-  );
-  res.json(filtreli);
-});
+    async function girisYap() {
+      const nickname = document.getElementById("nickname").value;
+      const sifre = document.getElementById("sifre").value;
+      const res = await fetch("https://kelebekserver.onrender.com/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ nickname, sifre })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        ben = nickname;
+        document.getElementById("kisiSecEkrani").style.display = "block";
+      } else alert(await res.text());
+    }
 
-io.on("connection", (socket) => {
-  socket.on("mesaj", (veri) => {
-    const tum = okuJSON(MESAJLAR_FILE);
-    tum.push(veri);
-    yazJSON(MESAJLAR_FILE, tum);
-    io.emit("mesaj", veri);
-  });
-});
+    async function kisiSec() {
+      const aranan = document.getElementById("aranacakKisi").value.trim();
+      if (!aranan) return alert("Bir kullanıcı adı girin");
+      const res = await fetch(`https://kelebekserver.onrender.com/exists/${aranan}`);
+      const sonuc = await res.json();
+      if (!sonuc.varMi) return alert("Bu kullanıcı bulunamadı!");
+      seciliKisi = aranan;
+      document.getElementById("kisiSecEkrani").style.display = "none";
+      document.getElementById("sohbetEkrani").style.display = "block";
+      document.getElementById("kullaniciBaslik").innerText = `${seciliKisi} ile Sohbet`;
 
-http.listen(PORT, () => {
-  console.log(`🚀 Sunucu ${PORT} portunda aktif`);
-});
+      const eskiMesajlar = await fetch(`https://kelebekserver.onrender.com/messages/${seciliKisi}`, {
+        credentials: "include"
+      });
+      const mesajlar = await eskiMesajlar.json();
+      const mesajlarDiv = document.getElementById("mesajlar");
+      mesajlarDiv.innerHTML = "";
+      mesajlar.forEach(data => {
+        const div = document.createElement("div");
+        div.className = "mesaj";
+        div.innerText = `${data.from}: ${data.text}`;
+        mesajlarDiv.appendChild(div);
+      });
+    }
+
+    function mesajGonder() {
+      const input = document.getElementById("mesajInput");
+      const mesaj = input.value.trim();
+      if (!mesaj || !seciliKisi) return;
+      socket.emit("mesaj", { from: ben, to: seciliKisi, text: mesaj });
+      input.value = "";
+    }
+
+    socket.on("mesaj", (data) => {
+      if (data.to === seciliKisi || data.from === seciliKisi) {
+        const div = document.createElement("div");
+        div.className = "mesaj";
+        div.innerText = `${data.from}: ${data.text}`;
+        document.getElementById("mesajlar").appendChild(div);
+      }
+    });
+  </script>
+</body>
+</html>
