@@ -20,7 +20,6 @@
       --button-bg: #ff82bc;
       --button-hover: #e56fa8;
 
-      /* Başlangıç varsayılan değerler */
       --bg: #1a1a1a;
       --text: #f1f1f1;
       --input-bg: #2a2a2a;
@@ -41,7 +40,7 @@
       transition: background 0.3s, color 0.3s;
     }
 
-    #girisEkrani, #sohbetEkrani {
+    #girisEkrani, #sohbetEkrani, #kisiSecEkrani {
       display: none;
       width: 100%;
       max-width: 400px;
@@ -114,7 +113,7 @@
         font-size: 0.95rem;
       }
 
-      #girisEkrani, #sohbetEkrani {
+      #girisEkrani, #sohbetEkrani, #kisiSecEkrani {
         width: 100%;
         padding: 15px;
         border-radius: 0;
@@ -147,8 +146,14 @@
     <button type="button" onclick="kayitOl()">Kayıt Ol</button>
   </div>
 
+  <div id="kisiSecEkrani">
+    <h2>Kişi Seç</h2>
+    <input type="text" id="aranacakKisi" placeholder="Kullanıcı ara...">
+    <button onclick="kisiSec()">Sohbete Başla</button>
+  </div>
+
   <div id="sohbetEkrani">
-    <h2 style="text-align:center;" id="kullaniciBaslik">Sohbet Odası</h2>
+    <h2 style="text-align:center;" id="kullaniciBaslik">Sohbet</h2>
     <div id="mesajlar"></div>
     <input type="text" id="mesajInput" placeholder="Mesaj...">
     <button type="button" onclick="mesajGonder()">Gönder</button>
@@ -156,6 +161,7 @@
 
   <script>
     const socket = io("https://kelebekserver.onrender.com", { withCredentials: true });
+    let seciliKisi = "";
 
     function temaUygula(mod) {
       const r = document.documentElement.style;
@@ -190,7 +196,8 @@
       const res = await fetch("https://kelebekserver.onrender.com/me", { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
-        baslatSohbet(data.kullanici);
+        document.getElementById("girisEkrani").style.display = "none";
+        document.getElementById("kisiSecEkrani").style.display = "block";
       } else {
         document.getElementById("girisEkrani").style.display = "block";
       }
@@ -206,7 +213,7 @@
         credentials: "include",
         body: JSON.stringify({ nickname, sifre, dogumtarihi })
       });
-      if (res.ok) baslatSohbet(nickname);
+      if (res.ok) document.getElementById("kisiSecEkrani").style.display = "block";
       else alert(await res.text());
     }
 
@@ -219,30 +226,34 @@
         credentials: "include",
         body: JSON.stringify({ nickname, sifre })
       });
-      if (res.ok) baslatSohbet(nickname);
+      if (res.ok) document.getElementById("kisiSecEkrani").style.display = "block";
       else alert(await res.text());
     }
 
-    function baslatSohbet(kullanici) {
-      document.getElementById("girisEkrani").style.display = "none";
+    function kisiSec() {
+      const aranan = document.getElementById("aranacakKisi").value.trim();
+      if (!aranan) return alert("Bir kullanıcı adı girin");
+      seciliKisi = aranan;
+      document.getElementById("kisiSecEkrani").style.display = "none";
       document.getElementById("sohbetEkrani").style.display = "block";
-      document.getElementById("kullaniciBaslik").innerText = `${kullanici} (aktif)`;
-      socket.emit("yeni-kullanici", kullanici);
+      document.getElementById("kullaniciBaslik").innerText = `${seciliKisi} ile Sohbet`;
     }
 
     function mesajGonder() {
       const input = document.getElementById("mesajInput");
       const mesaj = input.value.trim();
-      if (!mesaj) return;
-      socket.emit("mesaj", { from: "Ben", text: mesaj });
+      if (!mesaj || !seciliKisi) return;
+      socket.emit("mesaj", { from: "Ben", to: seciliKisi, text: mesaj });
       input.value = "";
     }
 
     socket.on("mesaj", (data) => {
-      const div = document.createElement("div");
-      div.className = "mesaj";
-      div.innerText = `${data.from}: ${data.text}`;
-      document.getElementById("mesajlar").appendChild(div);
+      if (data.to === seciliKisi || data.from === seciliKisi) {
+        const div = document.createElement("div");
+        div.className = "mesaj";
+        div.innerText = `${data.from}: ${data.text}`;
+        document.getElementById("mesajlar").appendChild(div);
+      }
     });
   </script>
 </body>
