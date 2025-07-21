@@ -32,6 +32,7 @@
       overflow: hidden;
       transition: background 0.3s, color 0.3s;
     }
+
     #girisEkrani, #sohbetEkrani {
       display: none;
       width: 100%;
@@ -42,6 +43,7 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.3);
       transition: background 0.3s;
     }
+
     input, button {
       width: 100%;
       padding: 10px;
@@ -51,30 +53,36 @@
       font-size: 1rem;
       transition: background 0.3s, color 0.3s;
     }
+
     input {
       background-color: var(--input-bg);
       color: var(--text);
     }
+
     button {
       background: var(--button-bg);
       color: white;
       border: none;
       cursor: pointer;
     }
+
     button:hover {
       background: var(--button-hover);
     }
+
     .mesaj {
       padding: 8px;
       margin: 6px 0;
       background: var(--message-bg);
       border-radius: 8px;
     }
+
     #mesajlar {
       max-height: 400px;
       overflow-y: auto;
       margin-bottom: 10px;
     }
+
     #temaToggle {
       position: absolute;
       top: 10px;
@@ -85,6 +93,11 @@
       color: white;
       border: none;
       cursor: pointer;
+    }
+
+    #temaToggle:hover {
+      transform: scale(1.1);
+      transition: transform 0.3s ease;
     }
 
     @media screen and (max-width: 600px) {
