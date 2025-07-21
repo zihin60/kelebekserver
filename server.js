@@ -1,216 +1,76 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kelebek Sohbet</title>
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <style>
-    :root {
-      --bg-light: #fdf6fa;
-      --text-light: #222;
-      --input-bg-light: #fff;
-      --message-bg-light: #eee;
+// server.js
+const express = require("express");
+const session = require("express-session");
+const cors = require("cors");
+const http = require("http");
+const { Server } = require("socket.io");
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: ["https://kelebekserver.vercel.app"],
+    credentials: true,
+  },
+});
 
-      --bg-dark: #1a1a1a;
-      --text-dark: #f1f1f1;
-      --input-bg-dark: #2a2a2a;
-      --message-bg-dark: #333;
+app.use(cors({
+  origin: "https://kelebekserver.vercel.app",
+  credentials: true,
+}));
 
-      --button-bg: #ff82bc;
-      --button-hover: #e56fa8;
+app.use(express.json());
 
-      --bg: #1a1a1a;
-      --text: #f1f1f1;
-      --input-bg: #2a2a2a;
-      --message-bg: #333;
-    }
+app.use(session({
+  secret: "kelebek-gizli",
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 1000 * 60 * 60 * 24 * 365 }, // 1 yıl
+}));
 
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      margin: 0;
-      display: flex;
-      height: 100vh;
-    }
+const users = {};
+const messages = {}; // { "kisi1-kisi2": [{from, to, text}] }
 
-    #sidebar {
-      width: 250px;
-      background-color: #2e2e2e;
-      padding: 10px;
-      overflow-y: auto;
-    }
+app.post("/login", (req, res) => {
+  const { nickname, sifre } = req.body;
+  if (!users[nickname]) return res.status(400).send("Kullanıcı bulunamadı");
+  if (users[nickname].sifre !== sifre) return res.status(403).send("Şifre hatalı");
+  req.session.nickname = nickname;
+  res.send("Giriş başarılı");
+});
 
-    #sidebar input {
-      width: 100%;
-      padding: 8px;
-      margin-bottom: 10px;
-      border-radius: 6px;
-      border: none;
-    }
+app.get("/users", (req, res) => {
+  if (!req.session.nickname) return res.status(401).send("Giriş yapın");
+  res.json(Object.keys(users));
+});
 
-    #kullanicilar {
-      list-style: none;
-      padding: 0;
-    }
+app.get("/messages/:kisi", (req, res) => {
+  const from = req.session.nickname;
+  const to = req.params.kisi;
+  if (!from || !to) return res.status(400).send("Eksik bilgi");
+  const key = [from, to].sort().join("-");
+  res.json(messages[key] || []);
+});
 
-    #kullanicilar li {
-      padding: 8px;
-      background: #3a3a3a;
-      color: white;
-      margin-bottom: 5px;
-      border-radius: 6px;
-      cursor: pointer;
-    }
+io.use((socket, next) => {
+  let req = socket.request;
+  let res = req.res;
+  session({
+    secret: "kelebek-gizli",
+    resave: false,
+    saveUninitialized: false,
+    cookie: { maxAge: 1000 * 60 * 60 * 24 * 365 },
+  })(req, res, next);
+});
 
-    #main {
-      flex-grow: 1;
-      display: flex;
-      flex-direction: column;
-    }
+io.on("connection", (socket) => {
+  const nickname = socket.request.session.nickname;
+  if (!nickname) return;
+  socket.on("mesaj", ({ from, to, text }) => {
+    const key = [from, to].sort().join("-");
+    if (!messages[key]) messages[key] = [];
+    messages[key].push({ from, to, text });
+    io.emit("mesaj", { from, to, text });
+  });
+});
 
-    #mesajlar {
-      flex-grow: 1;
-      padding: 10px;
-      overflow-y: auto;
-      background: var(--bg);
-    }
-
-    #girisEkrani {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      background: var(--bg);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      z-index: 10;
-    }
-
-    .mesaj {
-      margin-bottom: 8px;
-      padding: 8px;
-      background: var(--message-bg);
-      border-radius: 6px;
-    }
-
-    #mesajInputArea {
-      display: flex;
-      padding: 10px;
-      background: var(--bg);
-    }
-
-    #mesajInput {
-      flex-grow: 1;
-      padding: 10px;
-      border: none;
-      border-radius: 6px;
-      background: var(--input-bg);
-      color: var(--text);
-    }
-
-    #mesajGonderBtn {
-      padding: 10px;
-      margin-left: 10px;
-      background: var(--button-bg);
-      border: none;
-      border-radius: 6px;
-      color: white;
-      cursor: pointer;
-    }
-  </style>
-</head>
-<body>
-  <div id="girisEkrani">
-    <h2>Kelebek Sohbet</h2>
-    <input type="text" id="nickname" placeholder="Kullanıcı Adı">
-    <input type="password" id="sifre" placeholder="Şifre">
-    <button onclick="girisYap()">Giriş Yap</button>
-  </div>
-
-  <div id="sidebar">
-    <input type="text" id="aranacakKisi" placeholder="Kullanıcı ara...">
-    <ul id="kullanicilar"></ul>
-  </div>
-
-  <div id="main">
-    <div id="mesajlar"></div>
-    <div id="mesajInputArea">
-      <input type="text" id="mesajInput" placeholder="Mesaj yaz...">
-      <button id="mesajGonderBtn" onclick="mesajGonder()">Gönder</button>
-    </div>
-  </div>
-
-  <script>
-    const socket = io("https://kelebekserver.onrender.com", { withCredentials: true });
-    let seciliKisi = "";
-    let ben = "";
-
-    async function girisYap() {
-      const nickname = document.getElementById("nickname").value;
-      const sifre = document.getElementById("sifre").value;
-      const res = await fetch("https://kelebekserver.onrender.com/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ nickname, sifre })
-      });
-      if (res.ok) {
-        ben = nickname;
-        document.getElementById("girisEkrani").style.display = "none";
-        kullanicilariYukle();
-      } else {
-        alert(await res.text());
-      }
-    }
-
-    async function kullanicilariYukle() {
-      const res = await fetch("https://kelebekserver.onrender.com/users", { credentials: "include" });
-      const kisiler = await res.json();
-      const ul = document.getElementById("kullanicilar");
-      ul.innerHTML = "";
-      kisiler.forEach(kisi => {
-        if (kisi !== ben) {
-          const li = document.createElement("li");
-          li.textContent = kisi;
-          li.onclick = () => kisiSec(kisi);
-          ul.appendChild(li);
-        }
-      });
-    }
-
-    async function kisiSec(kisi) {
-      seciliKisi = kisi;
-      const mesajlarDiv = document.getElementById("mesajlar");
-      mesajlarDiv.innerHTML = "";
-      const res = await fetch(`https://kelebekserver.onrender.com/messages/${kisi}`, { credentials: "include" });
-      const mesajlar = await res.json();
-      mesajlar.forEach(data => {
-        const div = document.createElement("div");
-        div.className = "mesaj";
-        div.innerText = `${data.from}: ${data.text}`;
-        mesajlarDiv.appendChild(div);
-      });
-    }
-
-    function mesajGonder() {
-      const input = document.getElementById("mesajInput");
-      const mesaj = input.value.trim();
-      if (!mesaj || !seciliKisi) return;
-      socket.emit("mesaj", { from: ben, to: seciliKisi, text: mesaj });
-      input.value = "";
-    }
-
-    socket.on("mesaj", (data) => {
-      if (data.to === seciliKisi || data.from === seciliKisi) {
-        const div = document.createElement("div");
-        div.className = "mesaj";
-        div.innerText = `${data.from}: ${data.text}`;
-        document.getElementById("mesajlar").appendChild(div);
-      }
-    });
-  </script>
-</body>
-</html>
+server.listen(3000, () => console.log("Sunucu çalışıyor"));
