@@ -1,16 +1,21 @@
 {
-  "name": "kelebek-server",
+  "name": "kelebek-chat-server",
   "version": "1.0.0",
-  "description": "Kelebek Sohbet Sunucusu",
+  "description": "Kelebek özel sohbet sunucusu",
   "main": "server.js",
-  "type": "commonjs",
   "scripts": {
     "start": "node server.js"
   },
+  "keywords": [],
+  "author": "zihin60",
+  "license": "MIT",
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "express-session": "^1.17.3",
     "socket.io": "^4.7.5"
+  },
+  "engines": {
+    "node": ">=16.x"
   }
 }
