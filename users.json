@@ -1,1 +1,10 @@
-
+{
+  "zeynep": {
+    "sifre": "1234",
+    "dogum": "2006-02-14"
+  },
+  "matrak": {
+    "sifre": "kelebek123",
+    "dogum": "2005-08-09"
+  }
+}
