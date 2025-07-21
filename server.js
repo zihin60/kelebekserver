@@ -1,4 +1,3 @@
-// GÜNCELLENMİŞ VE SAĞLAMLAŞTIRILMIŞ SERVER.JS
 const express = require("express");
 const session = require("express-session");
 const path = require("path");
@@ -21,7 +20,7 @@ app.use(session({
   secret: "kelebek-secret",
   resave: false,
   saveUninitialized: true,
-  cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 }
+  cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 } // 7 gün
 }));
 
 // Kullanıcı veri okuma/yazma
@@ -50,54 +49,53 @@ function mesajEkle(mesaj) {
   fs.writeFileSync(MESAJLAR_FILE, JSON.stringify(tum, null, 2));
 }
 
+// API - Kayıt
+app.post("/register", (req, res) => {
+  const { nickname, sifre, dogumtarihi } = req.body;
+  const users = kullanicilariOku();
+  if (users.find(u => u.nickname === nickname)) {
+    return res.status(400).send("Bu kullanıcı adı zaten alınmış.");
+  }
+  kullaniciYaz({ nickname, sifre, dogumtarihi });
+  req.session.kullanici = nickname;
+  res.status(200).send("Kayıt başarılı");
+});
+
 // API - Giriş
-app.post("/giris", (req, res) => {
+app.post("/login", (req, res) => {
   const { nickname, sifre } = req.body;
   const users = kullanicilariOku();
   const eslesen = users.find(u => u.nickname === nickname && u.sifre === sifre);
-
   if (eslesen) {
     req.session.kullanici = nickname;
-    return res.json({ basarili: true });
+    return res.status(200).send("Giriş başarılı");
   }
-  res.json({ basarili: false });
+  res.status(401).send("Bilgiler eşleşmiyor");
 });
 
-// API - Kayıt
-app.post("/kayit", (req, res) => {
-  const { nickname, sifre, dogum } = req.body;
-  const users = kullanicilariOku();
-  if (users.find(u => u.nickname === nickname)) {
-    return res.json({ basarili: false, mesaj: "Kullanıcı zaten var" });
-  }
-  kullaniciYaz({ nickname, sifre, dogum });
-  req.session.kullanici = nickname;
-  res.json({ basarili: true });
-});
-
-// API - Aktif kullanıcı
+// API - Oturum kontrol
 app.get("/me", (req, res) => {
   if (req.session.kullanici) {
     return res.json({ kullanici: req.session.kullanici });
   }
-  res.status(401).json({ mesaj: "Giriş yapılmamış" });
+  res.status(401).json({ mesaj: "Oturum yok" });
 });
 
-// API - Mesajları getir
+// API - Mesajları al
 app.get("/mesajlar", (req, res) => {
   const veriler = mesajlariOku();
   res.json(veriler);
 });
 
 // API - Çıkış
-app.post("/cikis", (req, res) => {
+app.post("/logout", (req, res) => {
   req.session.destroy();
   res.json({ cikis: true });
 });
 
 // SOCKET.IO
 io.on("connection", (socket) => {
-  console.log("📡 Yeni kullanıcı bağlandı");
+  console.log("🟢 Yeni bağlantı");
 
   socket.on("mesaj", (veri) => {
     mesajEkle(veri);
@@ -105,7 +103,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log("🛑 Kullanıcı ayrıldı");
+    console.log("🔴 Bağlantı kesildi");
   });
 });
 
