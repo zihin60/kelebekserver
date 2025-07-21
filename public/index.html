@@ -127,7 +127,7 @@
   </div>
 
   <div id="sohbetEkrani">
-    <h2 style="text-align:center;">Sohbet Odası</h2>
+    <h2 style="text-align:center;" id="kullaniciBaslik">Sohbet Odası</h2>
     <div id="mesajlar"></div>
     <input type="text" id="mesajInput" placeholder="Mesaj...">
     <button type="button" onclick="mesajGonder()">Gönder</button>
@@ -205,6 +205,7 @@
     function baslatSohbet(kullanici) {
       document.getElementById("girisEkrani").style.display = "none";
       document.getElementById("sohbetEkrani").style.display = "block";
+      document.getElementById("kullaniciBaslik").innerText = `${kullanici} (aktif)`;
       socket.emit("yeni-kullanici", kullanici);
     }
 
